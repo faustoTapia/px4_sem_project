@@ -1384,6 +1384,8 @@ int DShotOutput::custom_command(int argc, char *argv[])
 	}
 
 	int motor_index = -1; // select motor index, default: -1=all
+	int motor_power = 900;
+	bool motor_telem = true;
 	int myoptind = 1;
 	int ch;
 	const char *myoptarg = nullptr;
@@ -1393,7 +1395,12 @@ int DShotOutput::custom_command(int argc, char *argv[])
 		case 'm':
 			motor_index = strtol(myoptarg, nullptr, 10) - 1;
 			break;
-
+		case 'p':
+			motor_power = strtol(myoptarg, nullptr, 10);
+			break;
+		case 't':
+			if (!strcmp(myoptarg, "0")) motor_telem = false;
+			break;
 		default:
 			return print_usage("unrecognized flag");
 		}
@@ -1446,6 +1453,22 @@ int DShotOutput::custom_command(int argc, char *argv[])
 		}
 
 		get_instance()->retrieveAndPrintESCInfoThreadSafe(motor_index);
+		return 0;
+	}
+
+	if (!strcmp(verb, "motor_command")){
+		if (!is_running()){
+			PX4_ERR("module not running");
+			return -1;
+		}
+		if (motor_index < -1 || motor_index >3){
+			PX4_ERR("Motor index invalid");
+			return -1;
+		}
+		// up_dshot_motor_command(motor_index, motor_power, motor_telem);
+		get_instance()->sendCommandThreadSafe(dshot_command_t{DShot_power_full}, 10000, motor_index);
+		PX4_INFO("\n Motor: %d\n Power: %d\n Telem Req: %d\n", motor_index, motor_power, motor_telem);
+
 		return 0;
 	}
 

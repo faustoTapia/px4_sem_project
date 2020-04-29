@@ -330,7 +330,9 @@ typedef enum {
 	DShot_cmd_signal_line_telemeetry_disable = 32,
 	DShot_cmd_signal_line_continuous_erpm_telemetry = 33,
 	DShot_cmd_MAX = 47,
-	DShot_cmd_MIN_throttle = 48
+	DShot_cmd_MIN_throttle = 48,
+	DShot_power_full = 2000,
+	DShot_power_hall = 1500
 				 // >47 are throttle values
 } dshot_command_t;
 
