@@ -1390,7 +1390,7 @@ int DShotOutput::custom_command(int argc, char *argv[])
 	int ch;
 	const char *myoptarg = nullptr;
 
-	while ((ch = px4_getopt(argc, argv, "m:", &myoptind, &myoptarg)) != EOF) {
+	while ((ch = px4_getopt(argc, argv, "m:p:t:", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
 		case 'm':
 			motor_index = strtol(myoptarg, nullptr, 10) - 1;
