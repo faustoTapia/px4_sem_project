@@ -37,6 +37,7 @@
  * Mixer collection.
  */
 
+// #include <px4_platform_common/log.h>
 #include "MixerGroup.hpp"
 
 #include "HelicopterMixer/HelicopterMixer.hpp"
@@ -48,6 +49,8 @@
 //#define debug(fmt, args...)	do { printf("[mixer] " fmt "\n", ##args); } while(0)
 //#include <debug.h>
 //#define debug(fmt, args...)	syslog(fmt "\n", ##args)
+
+#define MODULE_NAME  "mixer_group"
 
 unsigned
 MixerGroup::mix(float *outputs, unsigned space)
@@ -194,6 +197,7 @@ MixerGroup::load_from_buf(Mixer::ControlCallback control_cb, uintptr_t cb_handle
 
 		case 'M':
 			m = SimpleMixer::from_text(control_cb, cb_handle, p, resid);
+			// PX4_INFO("Simple Mixer created");
 			break;
 
 		case 'R':

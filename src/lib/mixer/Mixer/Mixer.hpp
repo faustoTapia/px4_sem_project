@@ -80,7 +80,8 @@
  *              out
  *
  * Scaling
- * -------
+ * -------CH
+
  *
  * Each scaler allows the input value to be scaled independently for
  * inputs greater/less than zero. An offset can be applied to the output,

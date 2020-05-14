@@ -1466,7 +1466,7 @@ int DShotOutput::custom_command(int argc, char *argv[])
 			return -1;
 		}
 		// up_dshot_motor_command(motor_index, motor_power, motor_telem);
-		get_instance()->sendCommandThreadSafe(dshot_command_t{DShot_power_full}, 10000, motor_index);
+		get_instance()->sendCommandThreadSafe(dshot_command_t{DShot_throttle_half}, 5000, motor_index);
 		PX4_INFO("\n Motor: %d\n Power: %d\n Telem Req: %d\n", motor_index, motor_power, motor_telem);
 
 		return 0;

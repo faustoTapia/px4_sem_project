@@ -1,0 +1,30 @@
+# Manual pass through mixer for main outputs 1 - 4
+
+# MAIN1 channel (select actuator_controls0 channel with INDEX_ROLL param)
+M: 1
+S: 0 0  0  10000      0 0  10000
+
+# MAIN2 channel (select actuator_controls0 channel with INDEX_PITCH param)
+M: 1
+S: 0 1  0  10000      0 0  10000
+
+# MAIN3 channel (select actuator_controls0 channel with INDEX_YAW param)
+M: 1
+S: 0 2  0  10000      0 0  10000
+
+# MAIN4 channel (select actuator_controls0 channel with INDEX_THROTTLE param)
+M: 1
+S: 0 3  0  10000      0 0  10000
+
+
+# MAIN 5
+Z:
+
+# MAIN 6
+Z:
+
+# MAIN 7
+Z:
+
+# MAIN 8
+Z:
