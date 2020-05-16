@@ -97,7 +97,7 @@ public:
 	 *				the mixer.
 	 * @param buflen		Length of the buffer in bytes, adjusted
 	 *				to reflect the bytes consumed.
-	 * @return			A new SimpleMixer instance, or nullptr
+	 * @return			A new SimpleMixer instanc_pinfoe, or nullptr
 	 *				if the text format is bad.
 	 */
 	static SimpleMixer		*from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handle, const char *buf,

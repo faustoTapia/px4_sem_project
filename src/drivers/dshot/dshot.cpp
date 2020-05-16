@@ -239,6 +239,7 @@ private:
 		(ParamFloat<px4::params::DSHOT_MIN>) _param_dshot_min,
 		(ParamInt<px4::params::MOT_POLE_COUNT>) _param_mot_pole_count
 	)
+
 };
 
 char DShotOutput::_telemetry_device[] {};
@@ -1472,6 +1473,17 @@ int DShotOutput::custom_command(int argc, char *argv[])
 		return 0;
 	}
 
+	// if (!strcmp(verb, "mixer_info")){
+	// 	if(!is_running()){
+	// 		PX4_ERR("module not running");
+	// 		return -1;
+	// 	}
+	// 	char str_out[8];
+	// 	size_t counter;
+	// 	_mixing_output.mixers()->get_mixers_info(str_out,counter);
+	// 	PX4_INFO("Module info: %s",str_out);
+	// }
+
 
 	if (!is_running()) {
 		int ret = DShotOutput::task_spawn(argc, argv);
@@ -1616,6 +1628,12 @@ int DShotOutput::print_status()
 		PX4_INFO("telemetry on: %s", _telemetry_device);
 		_telemetry->handler.printStatus();
 	}
+
+	char str_out[8];
+	size_t counter;
+	_mixing_output.mixers()->get_mixers_info(str_out,counter);
+	PX4_INFO("Number of mixers loaded: %d", counter);
+	PX4_INFO("Mixers loaded: %c%c%c%c%c%c%c%c", str_out[0], str_out[1], str_out[2], str_out[3], str_out[4], str_out[5], str_out[6], str_out[7]);
 
 	return 0;
 }

@@ -34,6 +34,7 @@
 #pragma once
 
 #include "Mixer/Mixer.hpp"
+#include <string.h>
 
 /**
  * Group of mixers, built up from single mixers and processed
@@ -165,6 +166,10 @@ public:
 
 	unsigned			get_multirotor_count();
 
+	void				get_mixers_info(char* out_str, size_t &str_len);
+
 private:
 	List<Mixer *>			_mixers;	/**< linked list of mixers */
+	size_t				_info_str_size{0};
+	char				_info_str[8]={'0','0','0','0','0','0','0','0'};
 };

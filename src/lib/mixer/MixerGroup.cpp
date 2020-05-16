@@ -193,19 +193,27 @@ MixerGroup::load_from_buf(Mixer::ControlCallback control_cb, uintptr_t cb_handle
 		switch (*p) {
 		case 'Z':
 			m = NullMixer::from_text(p, resid);
+			_info_str[_info_str_size] = 'Z';
+			_info_str_size++;
 			break;
 
 		case 'M':
 			m = SimpleMixer::from_text(control_cb, cb_handle, p, resid);
 			// PX4_INFO("Simple Mixer created");
+			_info_str[_info_str_size] = 'M';
+			_info_str_size++;
 			break;
 
 		case 'R':
 			m = MultirotorMixer::from_text(control_cb, cb_handle, p, resid);
+			_info_str[_info_str_size] = 'R';
+			_info_str_size++;
 			break;
 
 		case 'H':
 			m = HelicopterMixer::from_text(control_cb, cb_handle, p, resid);
+			_info_str[_info_str_size] = 'H';
+			_info_str_size++;
 			break;
 
 		default:
@@ -241,9 +249,16 @@ MixerGroup::load_from_buf(Mixer::ControlCallback control_cb, uintptr_t cb_handle
 	return ret;
 }
 
+
 void MixerGroup::set_max_delta_out_once(float delta_out_max)
 {
 	for (auto mixer : _mixers) {
 		mixer->set_max_delta_out_once(delta_out_max);
 	}
+}
+
+
+void MixerGroup::get_mixers_info(char* out_str, size_t &str_len){
+	strcpy(out_str, _info_str);
+	str_len = _info_str_size;
 }
