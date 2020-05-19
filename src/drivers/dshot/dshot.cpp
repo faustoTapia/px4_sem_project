@@ -1634,6 +1634,7 @@ int DShotOutput::print_status()
 	_mixing_output.mixers()->get_mixers_info(str_out,counter);
 	PX4_INFO("Number of mixers loaded: %d", counter);
 	PX4_INFO("Mixers loaded: %c%c%c%c%c%c%c%c", str_out[0], str_out[1], str_out[2], str_out[3], str_out[4], str_out[5], str_out[6], str_out[7]);
+	PX4_INFO("Mixer armed: %s",_mixing_output.armed().armed ? "true" : "false");
 
 	return 0;
 }

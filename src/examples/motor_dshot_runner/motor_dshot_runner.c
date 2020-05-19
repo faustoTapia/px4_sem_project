@@ -46,11 +46,13 @@
 #include <poll.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include <uORB/uORB.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/actuator_controls.h>
+#include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/esc_status.h>
 #include <drivers/drv_hrt.h>
 
@@ -77,75 +79,88 @@ int motor_dshot_runner_main(int argc, char *argv[])
 	/* advertise actuator_controls topic */
 	struct actuator_controls_s act_ctrl;
 	memset(&act_ctrl, 0, sizeof(act_ctrl));
-	orb_advert_t act_contrls_pub = orb_advertise(ORB_ID(actuator_controls_1), &act_ctrl);
+	orb_advert_t act_contrls_pub = orb_advertise(ORB_ID(actuator_controls_0), &act_ctrl);
 
-	int ctrl_sub_fd = orb_subscribe(ORB_ID(actuator_controls_1));
-	orb_set_interval(ctrl_sub_fd, 20);
-	px4_pollfd_struct_t ctrl_fds[]={{.fd=ctrl_sub_fd, .events=POLLIN},};
+	/* advertise actuator_armed*/
+	struct actuator_armed_s  act_armed;
+	memset (&act_armed, 0, sizeof(act_armed));
+	orb_advert_t act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &act_armed);
 
-	int error_counter = 0;
-	int count = 0;
+	// int ctrl_sub_fd = orb_subscribe(ORB_ID(actuator_controls_0));
+	// orb_set_interval(ctrl_sub_fd, 20);
+	// px4_pollfd_struct_t ctrl_fds[]={{.fd=ctrl_sub_fd, .events=POLLIN},};
+
+	// int error_counter = 0;
+	// int count = 0;
 	hrt_abstime start_time = hrt_absolute_time();
+	// hrt_abstime period_prev_time = hrt_absolute_time();
+	// hrt_abstime time_passed_in_period = hrt_absolute_time();
+
+
+	// Arming motors
+	act_armed.timestamp = hrt_absolute_time();
+	act_armed.armed_time_ms = act_armed.timestamp/1000;
+	act_armed.armed = true;
+	act_armed.prearmed = false;
+	act_armed.ready_to_arm = false;
+	act_armed.lockdown = false;
+	act_armed.manual_lockdown = false;
+	act_armed.force_failsafe = false;
+	act_armed.in_esc_calibration_mode = false;
+	act_armed.soft_stop = false;
+	orb_publish(ORB_ID(actuator_armed), act_armed_pub, &act_armed);
+
+
 	while (hrt_elapsed_time(&start_time)*1e-6 < RUN_TIME_S) {
-		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
-		// int poll_ret = px4_poll(fds, 1, 1000);
-		int poll_ret = px4_poll(ctrl_fds, 1, 1);
-		/* handle the poll result */
-		if (poll_ret == 0) {
-			/* this means none of our providers is giving us data */
-			// PX4_ERR("Got no data within %ds", 1);
+		// /* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
+		// // int poll_ret = px4_poll(fds, 1, 1000);
+		// int poll_ret = px4_poll(ctrl_fds, 1, 1);
+		// /* handle the poll result */
+		// if (poll_ret == 0) {
+		// 	/* this means none of our providers is giving us data */
+		// 	// PX4_ERR("Got no data within %ds", 1);
 
-		} else if (poll_ret < 0) {
-			/* this is seriously bad - should be an emergency */
-			if (error_counter < 10 || error_counter % 50 == 0) {
-				/* use a counter to prevent flooding (and slowing us down) */
-				PX4_ERR("ERROR return value from poll(): %d", poll_ret);
-			}
+		// } else if (poll_ret < 0) {
+		// 	/* this is seriously bad - should be an emergency */
+		// 	if (error_counter < 10 || error_counter % 50 == 0) {
+		// 		/* use a counter to prevent flooding (and slowing us down) */
+		// 		PX4_ERR("ERROR return value from poll(): %d", poll_ret);
+		// 	}
 
-			error_counter++;
+		// 	error_counter++;
 
-		} else {
-			if (ctrl_fds[0].revents & POLLIN) {
-			// if(true){
-				/* obtained data for the first file descriptor */
-				// struct esc_status_s raw;
-				// /* copy sensors raw data into local buffer */
-				// orb_copy(ORB_ID(esc_status), esc_sub_fd, &raw);
-				// if(count % 500 == 0){
-				// // if(true){
-				// 	for (int i=0; i < ESC_STATUS_CONNECTED_ESC_MAX; i++){
-				// 		PX4_INFO("RPM: %8d\tTemp: %8.4f\tVolt: %8.4f\n",
-				// 		(int32_t)raw.esc[i].esc_rpm,
-				// 		(double)raw.esc[i].esc_temperature,
-				// 		(double)raw.esc[i].esc_voltage);
-				// 	}
-				struct actuator_controls_s ctrl_raw;
-				orb_copy(ORB_ID(actuator_controls_1), ctrl_sub_fd, &ctrl_raw);
-				if (count%2 == 0){
-					PX4_INFO("Time: %8dms\tMotor2: %5f", (int)ctrl_raw.timestamp, (double)ctrl_raw.control[0]);
-					// PX4_INFO("Timestamp: %d", (int)ctrl_raw.timestamp);
-					// for (int i = 0; i< 8; i++){
-					// 	PX4_INFO("\tMotor %1d: %1.5f", i, (double)ctrl_raw.control[i]);
-					// }
-				}
-				count++;
+		// } else {
+		// 	if (ctrl_fds[0].revents & POLLIN) {
+		// 	// if(true){
+		// 		/* obtained data for the first file descriptor */
+		// 		// struct esc_status_s raw;
+		// 		// /* copy sensors raw data into local buffer */
+		// 		// orb_copy(ORB_ID(esc_status), esc_sub_fd, &raw);
+		// 		// if(count % 500 == 0){
+		// 		// // if(true){
+		// 		// 	for (int i=0; i < ESC_STATUS_CONNECTED_ESC_MAX; i++){
+		// 		// 		PX4_INFO("RPM: %8d\tTemp: %8.4f\tVolt: %8.4f\n",
+		// 		// 		(int32_t)raw.esc[i].esc_rpm,
+		// 		// 		(double)raw.esc[i].esc_temperature,
+		// 		// 		(double)raw.esc[i].esc_voltage);
+		// 		// 	}
+		// 		struct actuator_controls_s ctrl_raw;
+		// 		orb_copy(ORB_ID(actuator_controls_0), ctrl_sub_fd, &ctrl_raw);
+		// 		if (count%2 == 0){
+		// 			PX4_INFO("Time: %8dms\tMotor2: %5f", (int)ctrl_raw.timestamp, (double)ctrl_raw.control[0]);
+		// 			// PX4_INFO("Timestamp: %d", (int)ctrl_raw.timestamp);
+		// 			// for (int i = 0; i< 8; i++){
+		// 			// 	PX4_INFO("\tMotor %1d: %1.5f", i, (double)ctrl_raw.control[i]);
+		// 			// }
+		// 		}
+		// 		count++;
+		// 	}
 
-			}
+		// }
 
 
-
-			/* there could be more file descriptors here, in the form like:
-			 * if (fds[1..n].revents & POLLIN) {}
-			 */
-		}
-			/* set att and publish this information for other apps
-			the following does not have any meaning, it's just an example
-		*/
-		// att.q[0] = raw.accelerometer_m_s2[0];
-		// att.q[1] = raw.accelerometer_m_s2[1];
-		// att.q[2] = raw.accelerometer_m_s2[2];
-
-		act_ctrl.control[0] = (0.5-0.5*cos(2.0*(double)M_PI_F*(hrt_elapsed_time(&start_time) * 1e-6)/RUN_TIME_S))*0.5;
+		// act_ctrl.control[0] = (0.5-0.5*cos(2.0*(double)M_PI_F*(hrt_elapsed_time(&start_time) * 1e-6)/RUN_TIME_S));
+		act_ctrl.control[0] = 0;
 		act_ctrl.control[1] = 0;
 		act_ctrl.control[2] = 0;
 		act_ctrl.control[3] = 0;
@@ -156,10 +171,27 @@ int motor_dshot_runner_main(int argc, char *argv[])
 		act_ctrl.timestamp = hrt_elapsed_time(&start_time);
 		act_ctrl.timestamp_sample = hrt_elapsed_time(&start_time);
 
-		orb_publish(ORB_ID(actuator_controls_1), act_contrls_pub, &act_ctrl);
-		// px4_usleep(1000*2);
+		// time_passed_in_period = hrt_absolute_time()- period_prev_time;
+		// px4_usleep(1250-time_passed_in_period);c
+		// period_prev_time = hrt_absolute_time();
+		px4_usleep(1250);
+		orb_publish(ORB_ID(actuator_controls_0), act_contrls_pub, &act_ctrl);
+
 	}
-	PX4_INFO("Received data %d times", count);
+	// PX4_INFO("Received data %d times", count);
+	// Arming devices
+	act_armed.timestamp = hrt_absolute_time();
+	act_armed.armed_time_ms = act_armed.timestamp/1000;
+	act_armed.armed = false;
+	act_armed.prearmed = false;
+	act_armed.ready_to_arm = false;
+	act_armed.lockdown = false;
+	act_armed.manual_lockdown = false;
+	act_armed.force_failsafe = false;
+	act_armed.in_esc_calibration_mode = false;
+	act_armed.soft_stop = false;
+	orb_publish(ORB_ID(actuator_armed), act_armed_pub, &act_armed);
+
 
 	PX4_INFO("exiting");
 
