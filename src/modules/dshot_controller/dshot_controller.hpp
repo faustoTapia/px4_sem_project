@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,29 +33,27 @@
 
 #pragma once
 
+#include <lib/perf/perf_counter.h>
 #include <px4_platform_common/module.h>
 #include <px4_platform_common/module_params.h>
+#include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
+#include <uORB/Publication.hpp>
+#include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
-#include <uORB/topics/parameter_update.h>
-
-#include <lib/perf/perf_counter.h>
-
-
-extern "C" __EXPORT int dshot_controller_main(int argc, char *argv[]);
+#include <uORB/SubscriptionCallback.hpp>
+#include <uORB/topics/actuator_controls.h>
+#include <uORB/topics/vehicle_angular_velocity.h>
+#include <uORB/topics/actuator_armed.h>
 
 
-class DshotController : public ModuleBase<DshotController>, public ModuleParams
+class DshotController : public ModuleBase<DshotController>, public ModuleParams, public px4::WorkItem
 {
 public:
-	DshotController(int example_param, bool example_flag);
-
-	virtual ~DshotController();
+	DshotController();
+	~DshotController() override;
 
 	/** @see ModuleBase */
 	static int task_spawn(int argc, char *argv[]);
-
-	/** @see ModuleBase */
-	static DshotController *instantiate(int argc, char *argv[]);
 
 	/** @see ModuleBase */
 	static int custom_command(int argc, char *argv[]);
@@ -63,30 +61,20 @@ public:
 	/** @see ModuleBase */
 	static int print_usage(const char *reason = nullptr);
 
-	/** @see ModuleBase::run() */
-	void run() override;
-
-	/** @see ModuleBase::print_status() */
-	int print_status() override;
+	bool init();
 
 private:
+	void Run() override;
 
-	/**
-	 * Check for parameter changes and update them if needed.
-	 * @param parameter_update_sub uorb subscription to parameter_update
-	 * @param force for a parameter update
-	 */
-	void parameters_update(bool force = false);
+	uORB::SubscriptionCallbackWorkItem _vehicle_angular_velocity_sub{this, ORB_ID(vehicle_angular_velocity)};
 
-	perf_counter_t _loop_perf;
+	uORB::Publication<actuator_controls_s>		_actuators_0_pub;
 
-	DEFINE_PARAMETERS(
-		(ParamInt<px4::params::SYS_AUTOSTART>) _param_sys_autostart,   /**< example parameter */
-		(ParamInt<px4::params::SYS_AUTOCONFIG>) _param_sys_autoconfig  /**< another parameter */
-	)
+	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
 
-	// Subscriptions
-	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};
+	hrt_abstime _last_run{0};
+
+	static void arm_motors();
+	static void disarm_motors();
 
 };
-

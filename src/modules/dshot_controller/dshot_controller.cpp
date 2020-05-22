@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2018 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2019 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,226 +33,162 @@
 
 #include "dshot_controller.hpp"
 
-#include <px4_platform_common/getopt.h>
-#include <px4_platform_common/log.h>
-#include <px4_platform_common/posix.h>
-
-#include <uORB/topics/parameter_update.h>
-#include <uORB/topics/sensor_combined.h>
-
-#include <uORB/topics/actuator_controls.h>
-#include <uORB/topics/actuator_armed.h>
-
 #include <drivers/drv_hrt.h>
-#include <math.h>
+#include <px4_platform_common/getopt.h>
 
-DshotController::~DshotController(){
-	perf_free(_loop_perf)
+
+
+DshotController::DshotController():
+	ModuleParams(nullptr),
+	WorkItem(MODULE_NAME, px4::wq_configurations::rate_ctrl),
+	_actuators_0_pub(ORB_ID(actuator_controls_0)),
+	_loop_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle"))
+{
 }
 
-int DshotController::print_status()
+DshotController::~DshotController()
 {
-	PX4_INFO("Running");
-	// TODO: print additional runtime information about the state of the module
-	return 0;
+	perf_free(_loop_perf);
+}
+
+
+void
+DshotController::arm_motors()
+{
+	uORB::Publication<actuator_armed_s> actuator_armed_pub(ORB_ID(actuator_armed));
+	actuator_armed_s act_arm;
+	act_arm.armed_time_ms = (int)(hrt_absolute_time()/1000);
+	act_arm.armed = true;
+	act_arm.prearmed = false;
+	act_arm.ready_to_arm = true;
+	act_arm.lockdown = false;
+	act_arm.manual_lockdown = false;
+	act_arm.force_failsafe = false;
+	act_arm.in_esc_calibration_mode = false;
+	act_arm.soft_stop = false;
+	actuator_armed_pub.publish(act_arm);
+}
+
+void
+DshotController::disarm_motors()
+{
+	uORB::Publication<actuator_armed_s> actuator_armed_pub(ORB_ID(actuator_armed));
+	actuator_armed_s act_arm;
+	act_arm.armed_time_ms = (int)(hrt_absolute_time()/1000);
+	act_arm.armed = false;
+	act_arm.prearmed = false;
+	act_arm.ready_to_arm = true;
+	act_arm.lockdown = false;
+	act_arm.manual_lockdown = false;
+	act_arm.force_failsafe = false;
+	act_arm.in_esc_calibration_mode = false;
+	act_arm.soft_stop = false;
+	actuator_armed_pub.publish(act_arm);
+}
+
+
+bool
+DshotController::init()
+{
+	if (!_vehicle_angular_velocity_sub.registerCallback()) {
+		PX4_ERR("vehicle_angular_velocity callback registration failed!");
+		return false;
+	}
+
+	return true;
+}
+
+
+void
+DshotController::Run()
+{
+	if (should_exit()) {
+		_vehicle_angular_velocity_sub.unregisterCallback();
+		exit_and_cleanup();
+		return;
+	}
+
+	perf_begin(_loop_perf);
+	vehicle_angular_velocity_s ang_vel;
+	if (_vehicle_angular_velocity_sub.update(&ang_vel)){
+		actuator_controls_s act_ctrl;
+		act_ctrl.timestamp = hrt_absolute_time();
+		act_ctrl.timestamp_sample = hrt_absolute_time();
+		act_ctrl.control[0] = 1;
+		act_ctrl.control[1] = 0.5;
+		act_ctrl.control[2] = 0.5;
+		act_ctrl.control[3] = 0.5;
+		act_ctrl.control[4] = 0.5;
+		act_ctrl.control[5] = 0.5;
+		act_ctrl.control[6] = 0.5;
+		act_ctrl.control[7] = 0.5;
+		_actuators_0_pub.publish(act_ctrl);
+	}
+
+
+	perf_end(_loop_perf);
+}
+
+int DshotController::task_spawn(int argc, char *argv[])
+{
+	DshotController *instance = new DshotController();
+
+	if (instance) {
+		_object.store(instance);
+		_task_id = task_id_is_work_queue;
+
+		if (instance->init()) {
+			return PX4_OK;
+		}
+
+	} else {
+		PX4_ERR("alloc failed");
+	}
+
+	delete instance;
+	_object.store(nullptr);
+	_task_id = -1;
+
+	return PX4_ERROR;
 }
 
 int DshotController::custom_command(int argc, char *argv[])
 {
-	/*
-	if (!is_running()) {
-		print_usage("not running");
-		return 1;
-	}
-	// additional custom commands can be handled like this:
-	if (!strcmp(argv[0], "do-something")) {
-		get_instance()->do_something();
+	const char *verb = argv[0];
+
+	if (!strcmp(verb, "arm")) {
+		PX4_INFO("Arming");
+		arm_motors();
 		return 0;
 	}
-	 */
+
+	if (!strcmp(verb, "disarm")){
+		PX4_INFO("Disarming");
+		disarm_motors();
+		return 0;
+	}
+
+	// int motor_index;
+	// float motor_power = 0.0;
+
+	// int myoptind = 1;
+	// int ch;
+	// const char *myoptarg = nullptr;
+	// while ((ch = px4_getopt(argc, argv, "m:p:", &myoptind, &myoptarg)) != EOF) {
+	// 	switch (ch) {
+	// 	case 'm':
+
+	// 		motor_index = strtol(myoptarg, nullptr, 10) - 1;
+	// 		break;
+	// 	case 'p':
+	// 		motor_power = strtol(myoptarg, nullptr, 10);
+	// 		break;
+	// 	default:
+	// 		return print_usage("unrecognized flag");
+	// 	}
+	// }
 
 	return print_usage("unknown command");
-}
-
-
-int DshotController::task_spawn(int argc, char *argv[])
-{
-	_task_id = px4_task_spawn_cmd("module",
-				      SCHED_DEFAULT,
-				      SCHED_PRIORITY_DEFAULT,
-				      1024,
-				      (px4_main_t)&run_trampoline,
-				      (char *const *)argv);
-
-	if (_task_id < 0) {
-		_task_id = -1;
-		return -errno;
-	}
-
-	return 0;
-}
-
-DshotController *DshotController::instantiate(int argc, char *argv[])
-{
-	int example_param = 0;
-	bool example_flag = false;
-	bool error_flag = false;
-
-	int myoptind = 1;
-	int ch;
-	const char *myoptarg = nullptr;
-
-	// parse CLI arguments
-	while ((ch = px4_getopt(argc, argv, "p:f", &myoptind, &myoptarg)) != EOF) {
-		switch (ch) {
-		case 'p':
-			example_param = (int)strtol(myoptarg, nullptr, 10);
-			break;
-
-		case 'f':
-			example_flag = true;
-			break;
-
-		case '?':
-			error_flag = true;
-			break;
-
-		default:
-			PX4_WARN("unrecognized flag");
-			error_flag = true;
-			break;
-		}
-	}
-
-	if (error_flag) {
-		return nullptr;
-	}
-
-	DshotController *instance = new DshotController(example_param, example_flag);
-
-	if (instance == nullptr) {
-		PX4_ERR("alloc failed");
-	}
-
-	return instance;
-}
-
-DshotController::DshotController(int example_param, bool example_flag)
-	: ModuleParams(nullptr)
-{
-}
-
-void DshotController::run()
-{
-	// Example: run the loop synchronized to the sensor_combined topic publication
-	int sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
-
-
-	/* advertise actuator_controls topic */
-	struct actuator_controls_s act_ctrl;
-	memset(&act_ctrl, 0, sizeof(act_ctrl));
-	orb_advert_t act_contrls_pub = orb_advertise(ORB_ID(actuator_controls_0), &act_ctrl);
-
-	/* advertise actuator_armed*/
-	struct actuator_armed_s  act_armed;
-	memset (&act_armed, 0, sizeof(act_armed));
-	orb_advert_t act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &act_armed);
-
-	// Arming motors
-	act_armed.timestamp = hrt_absolute_time();
-	act_armed.armed_time_ms = act_armed.timestamp/1000;
-	act_armed.armed = true;
-	act_armed.prearmed = false;
-	act_armed.ready_to_arm = false;
-	act_armed.lockdown = false;
-	act_armed.manual_lockdown = false;
-	act_armed.force_failsafe = false;
-	act_armed.in_esc_calibration_mode = false;
-	act_armed.soft_stop = false;
-	orb_publish(ORB_ID(actuator_armed), act_armed_pub, &act_armed);
-
-	px4_pollfd_struct_t fds[1];
-	fds[0].fd = sensor_combined_sub;
-	fds[0].events = POLLIN;
-
-	// initialize parameters
-	parameters_update(true);
-
-
-	// long counter = 0;
-
-	hrt_abstime start_time = hrt_absolute_time();
-	act_ctrl.control[0] = 0.5;
-	act_ctrl.control[1] = 0;
-	act_ctrl.control[2] = 0;
-	act_ctrl.control[3] = 0;
-	act_ctrl.control[4] = 0;
-	act_ctrl.control[5] = 0;
-	act_ctrl.control[6] = 0;
-	act_ctrl.control[7] = 0;
-	act_ctrl.timestamp = hrt_absolute_time();
-	act_ctrl.timestamp_sample = hrt_elapsed_time(&start_time);
-
-	perf_begin(_loop_perf);
-	while (!should_exit()) {
-
-		// wait for up to 1000ms for data
-		int pret = px4_poll(fds, (sizeof(fds) / sizeof(fds[0])), 1000);
-
-		if (pret == 0) {
-			// Timeout: let the loop run anyway, don't do `continue` here
-
-		} else if (pret < 0) {
-			// this is undesirable but not much we can do
-			PX4_ERR("poll error %d, %d", pret, errno);
-			px4_usleep(50000);
-			continue;
-
-		} else if (fds[0].revents & POLLIN) {
-
-			struct sensor_combined_s sensor_combined;
-			orb_copy(ORB_ID(sensor_combined), sensor_combined_sub, &sensor_combined);
-			// TODO: do something with the data...
-
-
-			orb_publish(ORB_ID(actuator_controls_0), act_contrls_pub, &act_ctrl);
-
-			// if (counter%250 == 0){
-			// PX4_INFO("N/250 command sent: %ld", ++counter);
-			// }
-		}
-		parameters_update();
-		perf_end(_loop_perf);
-	}
-	// Disarming motors
-	act_armed.timestamp = hrt_absolute_time();
-	act_armed.armed_time_ms = act_armed.timestamp/1000;
-	act_armed.armed = false;
-	act_armed.prearmed = false;
-	act_armed.ready_to_arm = false;
-	act_armed.lockdown = false;
-	act_armed.manual_lockdown = false;
-	act_armed.force_failsafe = false;
-	act_armed.in_esc_calibration_mode = false;
-	act_armed.soft_stop = false;
-	orb_publish(ORB_ID(actuator_armed), act_armed_pub, &act_armed);
-
-	// free(&act_armed);
-	// free(&act_ctrl);
-	orb_unsubscribe(sensor_combined_sub);
-}
-
-void DshotController::parameters_update(bool force)
-{
-	// check for parameter updates
-	if (_parameter_update_sub.updated() || force) {
-		// clear update
-		parameter_update_s update;
-		_parameter_update_sub.copy(&update);
-
-		// update parameters from storage
-		updateParams();
-	}
 }
 
 int DshotController::print_usage(const char *reason)
@@ -264,25 +200,18 @@ int DshotController::print_usage(const char *reason)
 	PRINT_MODULE_DESCRIPTION(
 		R"DESCR_STR(
 ### Description
-Section that describes the provided module functionality.
-This is a template for a module running as a task in the background with start/stop/status functionality.
-### Implementation
-Section describing the high-level implementation of this module.
-### Examples
-CLI usage example:
-$ module start -f -p 42
+This implements communication to esc via Dshot protocol
+
 )DESCR_STR");
 
-	PRINT_MODULE_USAGE_NAME("module", "template");
+	PRINT_MODULE_USAGE_NAME("mc_rate_control", "controller");
 	PRINT_MODULE_USAGE_COMMAND("start");
-	PRINT_MODULE_USAGE_PARAM_FLAG('f', "Optional example flag", true);
-	PRINT_MODULE_USAGE_PARAM_INT('p', 0, 0, 1000, "Optional example parameter", true);
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 
 	return 0;
 }
 
-int dshot_controller_main(int argc, char *argv[])
+extern "C" __EXPORT int dshot_controller_main(int argc, char *argv[])
 {
 	return DshotController::main(argc, argv);
 }
