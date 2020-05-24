@@ -61,7 +61,9 @@ public:
 	/** @see ModuleBase */
 	static int print_usage(const char *reason = nullptr);
 
+
 	bool init();
+
 
 private:
 	void Run() override;
@@ -73,6 +75,11 @@ private:
 	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
 
 	hrt_abstime _last_run{0};
+
+	actuator_controls_s _act_ctrl;
+
+	struct actuator_armed_s  _act_arm;
+	orb_advert_t _act_armed_pub;
 
 	static void arm_motors();
 	static void disarm_motors();

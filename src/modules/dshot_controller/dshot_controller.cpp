@@ -37,7 +37,6 @@
 #include <px4_platform_common/getopt.h>
 
 
-
 DshotController::DshotController():
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::rate_ctrl),
@@ -55,35 +54,44 @@ DshotController::~DshotController()
 void
 DshotController::arm_motors()
 {
-	uORB::Publication<actuator_armed_s> actuator_armed_pub(ORB_ID(actuator_armed));
-	actuator_armed_s act_arm;
-	act_arm.armed_time_ms = (int)(hrt_absolute_time()/1000);
-	act_arm.armed = true;
-	act_arm.prearmed = false;
-	act_arm.ready_to_arm = true;
-	act_arm.lockdown = false;
-	act_arm.manual_lockdown = false;
-	act_arm.force_failsafe = false;
-	act_arm.in_esc_calibration_mode = false;
-	act_arm.soft_stop = false;
-	actuator_armed_pub.publish(act_arm);
+	/* advertise actuator_armed*/
+	// struct actuator_armed_s  act_arm;
+	// memset (&act_arm, 0, sizeof(act_arm));
+	// orb_advert_t act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &act_arm);
+
+	get_instance()->_act_arm.armed_time_ms = (int)(hrt_absolute_time()/1000);
+	get_instance()->_act_arm.armed = true;
+	get_instance()->_act_arm.prearmed = false;
+	get_instance()->_act_arm.ready_to_arm = true;
+	get_instance()->_act_arm.lockdown = false;
+	get_instance()->_act_arm.manual_lockdown = false;
+	get_instance()->_act_arm.force_failsafe = false;
+	get_instance()->_act_arm.in_esc_calibration_mode = false;
+	get_instance()->_act_arm.soft_stop = false;
+
+	orb_publish(ORB_ID(actuator_armed), get_instance()->_act_armed_pub, &get_instance()->_act_arm);
 }
 
 void
 DshotController::disarm_motors()
 {
-	uORB::Publication<actuator_armed_s> actuator_armed_pub(ORB_ID(actuator_armed));
-	actuator_armed_s act_arm;
-	act_arm.armed_time_ms = (int)(hrt_absolute_time()/1000);
-	act_arm.armed = false;
-	act_arm.prearmed = false;
-	act_arm.ready_to_arm = true;
-	act_arm.lockdown = false;
-	act_arm.manual_lockdown = false;
-	act_arm.force_failsafe = false;
-	act_arm.in_esc_calibration_mode = false;
-	act_arm.soft_stop = false;
-	actuator_armed_pub.publish(act_arm);
+	/* advertise actuator_armed*/
+	// struct actuator_armed_s  act_arm;
+	// memset (&act_arm, 0, sizeof(act_arm));
+	// orb_advert_t act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &act_arm);
+
+	// uORB::Publication<actuator_armed_s> actuator_armed_pub(ORB_ID(actuator_armed));
+	get_instance()->_act_arm.armed_time_ms = (int)(hrt_absolute_time()/1000);
+	get_instance()->_act_arm.armed = false;
+	get_instance()->_act_arm.prearmed = false;
+	get_instance()->_act_arm.ready_to_arm = true;
+	get_instance()->_act_arm.lockdown = false;
+	get_instance()->_act_arm.manual_lockdown = false;
+	get_instance()->_act_arm.force_failsafe = false;
+	get_instance()->_act_arm.in_esc_calibration_mode = false;
+	get_instance()->_act_arm.soft_stop = false;
+	orb_publish(ORB_ID(actuator_armed), get_instance()->_act_armed_pub, &get_instance()->_act_arm);
+
 }
 
 
@@ -94,6 +102,21 @@ DshotController::init()
 		PX4_ERR("vehicle_angular_velocity callback registration failed!");
 		return false;
 	}
+	actuator_controls_s act_ctrl_instantaenous;
+	act_ctrl_instantaenous.timestamp = hrt_absolute_time();
+	act_ctrl_instantaenous.timestamp_sample = hrt_absolute_time();
+	act_ctrl_instantaenous.control[0] = 0;
+	act_ctrl_instantaenous.control[1] = 0;
+	act_ctrl_instantaenous.control[2] = 0;
+	act_ctrl_instantaenous.control[3] = 0;
+	act_ctrl_instantaenous.control[4] = 0;
+	act_ctrl_instantaenous.control[5] = 0;
+	act_ctrl_instantaenous.control[6] = 0;
+	act_ctrl_instantaenous.control[7] = 0;
+	_act_ctrl = act_ctrl_instantaenous;
+
+	memset (&_act_arm, 0, sizeof(_act_arm));
+	_act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &_act_arm);
 
 	return true;
 }
@@ -111,18 +134,9 @@ DshotController::Run()
 	perf_begin(_loop_perf);
 	vehicle_angular_velocity_s ang_vel;
 	if (_vehicle_angular_velocity_sub.update(&ang_vel)){
-		actuator_controls_s act_ctrl;
-		act_ctrl.timestamp = hrt_absolute_time();
-		act_ctrl.timestamp_sample = hrt_absolute_time();
-		act_ctrl.control[0] = 1;
-		act_ctrl.control[1] = 0.5;
-		act_ctrl.control[2] = 0.5;
-		act_ctrl.control[3] = 0.5;
-		act_ctrl.control[4] = 0.5;
-		act_ctrl.control[5] = 0.5;
-		act_ctrl.control[6] = 0.5;
-		act_ctrl.control[7] = 0.5;
-		_actuators_0_pub.publish(act_ctrl);
+		_act_ctrl.timestamp = hrt_absolute_time();
+		_act_ctrl.timestamp_sample = _act_ctrl.timestamp_sample;
+		_actuators_0_pub.publish(_act_ctrl);
 	}
 
 
@@ -132,7 +146,6 @@ DshotController::Run()
 int DshotController::task_spawn(int argc, char *argv[])
 {
 	DshotController *instance = new DshotController();
-
 	if (instance) {
 		_object.store(instance);
 		_task_id = task_id_is_work_queue;
@@ -168,25 +181,68 @@ int DshotController::custom_command(int argc, char *argv[])
 		return 0;
 	}
 
-	// int motor_index;
-	// float motor_power = 0.0;
+	if (!strcmp(verb, "throttle")){
+		if (is_running()){
+			actuator_controls_s act_ctrl_temp;
+			act_ctrl_temp = get_instance()->_act_ctrl;
+			PX4_INFO("Current throttle: ");
+			PX4_INFO("Timestamp: %ld", (long)act_ctrl_temp.timestamp);
+			for (int i=0 ; i < 8; i++){
+				PX4_INFO("Motor %d: %f", i+1, (double)act_ctrl_temp.control[i]);
+			}
+			return 0;
+		}
+		print_usage("Module not started");
+		return -1;
 
-	// int myoptind = 1;
-	// int ch;
-	// const char *myoptarg = nullptr;
-	// while ((ch = px4_getopt(argc, argv, "m:p:", &myoptind, &myoptarg)) != EOF) {
-	// 	switch (ch) {
-	// 	case 'm':
+	}
 
-	// 		motor_index = strtol(myoptarg, nullptr, 10) - 1;
-	// 		break;
-	// 	case 'p':
-	// 		motor_power = strtol(myoptarg, nullptr, 10);
-	// 		break;
-	// 	default:
-	// 		return print_usage("unrecognized flag");
-	// 	}
-	// }
+	if (!strcmp(verb, "command")){
+		if (is_running()){
+			int motor_index =0;
+			float motor_power = 0.0;
+			int myoptind = 1;
+			int ch;
+			const char *myoptarg = nullptr;
+			while ((ch = px4_getopt(argc, argv, "m:p:", &myoptind, &myoptarg)) != EOF) {
+				switch (ch) {
+				case 'm':
+
+					motor_index = strtol(myoptarg, nullptr, 10) - 1;
+					if (motor_index<0 || motor_index>7){
+						return print_usage("invalid channel");
+					}
+					break;
+				case 'p':
+					motor_power = strtof(myoptarg, nullptr);
+					if (motor_power<0 || motor_power>1){
+						return print_usage("invalid throttle");
+					}
+					break;
+				default:
+					return print_usage("unrecognized flag");
+				}
+			}
+
+			actuator_controls_s act_ctrl_temp;
+			act_ctrl_temp.timestamp = hrt_absolute_time();
+			act_ctrl_temp.timestamp_sample = hrt_absolute_time();
+			act_ctrl_temp.control[0] = 0.0;
+			act_ctrl_temp.control[1] = 0.0;
+			act_ctrl_temp.control[2] = 0.0;
+			act_ctrl_temp.control[3] = 0.0;
+			act_ctrl_temp.control[4] = 0.0;
+			act_ctrl_temp.control[5] = 0.0;
+			act_ctrl_temp.control[6] = 0.0;
+			act_ctrl_temp.control[7] = 0.0;
+			act_ctrl_temp.control[motor_index] = motor_power;
+			get_instance()->_act_ctrl=act_ctrl_temp;
+			PX4_INFO("Sent speed motor %d: %f", motor_index+1, (double)get_instance()->_act_ctrl.control[motor_index]);
+			return 0;
+		}
+		return print_usage("Module not started");
+
+	}
 
 	return print_usage("unknown command");
 }
@@ -207,6 +263,16 @@ This implements communication to esc via Dshot protocol
 	PRINT_MODULE_USAGE_NAME("mc_rate_control", "controller");
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
+
+	PRINT_MODULE_USAGE_COMMAND_DESCR("arm", "Sends arming command to actuator_armed topic");
+
+	PRINT_MODULE_USAGE_COMMAND_DESCR("disarm", "Sends disarming command to actuator_armed topic");
+
+	PRINT_MODULE_USAGE_COMMAND_DESCR("throttle", "Prints current throttle being sent");
+
+	PRINT_MODULE_USAGE_COMMAND_DESCR("command", "Sends throttle command to specified motor (others 0)");
+	PRINT_MODULE_USAGE_PARAM_INT('m', 1, 1, 8, "Motor selected (1-8)", false);
+	PRINT_MODULE_USAGE_PARAM_FLOAT('p', 0.0, 0.0, 1.0, "Throttle value (0-1)", false);
 
 	return 0;
 }
