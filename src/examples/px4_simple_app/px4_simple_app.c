@@ -50,6 +50,8 @@
 #include <uORB/uORB.h>
 #include <uORB/topics/sensor_combined.h>
 #include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_imu.h>
+#include <uORB/topics/vehicle_local_position.h>
 
 __EXPORT int px4_simple_app_main(int argc, char *argv[]);
 
@@ -60,7 +62,15 @@ int px4_simple_app_main(int argc, char *argv[])
 	/* subscribe to sensor_combined topic */
 	int sensor_sub_fd = orb_subscribe(ORB_ID(sensor_combined));
 	/* limit the update rate to 5 Hz */
-	orb_set_interval(sensor_sub_fd, 200);
+	orb_set_interval(sensor_sub_fd, 0);
+
+	/* subscribe to vehicle_imu*/
+	// int vehicle_imu_sub_fd = orb_subscribe(ORB_ID(vehicle_imu));
+	// orb_set_interval(vehicle_imu_sub_fd, 0);
+
+	/* subscribe to vehicle_loca_position*/
+	int vehicle_local_position_sub_fd = orb_subscribe(ORB_ID(vehicle_local_position));
+	orb_set_interval(vehicle_local_position_sub_fd, 0);
 
 	/* advertise attitude topic */
 	struct vehicle_attitude_s att;
@@ -70,6 +80,8 @@ int px4_simple_app_main(int argc, char *argv[])
 	/* one could wait for multiple topics with this technique, just using one here */
 	px4_pollfd_struct_t fds[] = {
 		{ .fd = sensor_sub_fd,   .events = POLLIN },
+		// { .fd = vehicle_imu_sub_fd, .events = POLLIN },
+		{ .fd = vehicle_local_position_sub_fd, .events = POLLIN},
 		/* there could be more file descriptors here, in the form like:
 		 * { .fd = other_sub_fd,   .events = POLLIN },
 		 */
@@ -77,9 +89,9 @@ int px4_simple_app_main(int argc, char *argv[])
 
 	int error_counter = 0;
 
-	for (int i = 0; i < 5; i++) {
+	for (int i = 0; i < 50; i++) {
 		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
-		int poll_ret = px4_poll(fds, 1, 1000);
+		int poll_ret = px4_poll(fds, 2, 0);
 
 		/* handle the poll result */
 		if (poll_ret == 0) {
@@ -115,6 +127,22 @@ int px4_simple_app_main(int argc, char *argv[])
 				att.q[2] = raw.accelerometer_m_s2[2];
 
 				orb_publish(ORB_ID(vehicle_attitude), att_pub, &att);
+			}
+			// if (fds[1].revents & POLLIN){
+			// 	struct vehicle_imu_s raw;
+			// 	orb_copy(ORB_ID(vehicle_imu), vehicle_imu_sub_fd, &raw);
+			// 	PX4_INFO("Vehicle IMU: \t%8.4f\t%8.4f\t%8.4f",
+			// 		(double)raw.delta_angle[0],
+			// 		(double)raw.delta_angle[1],
+			// 		(double)raw.delta_angle[2]);
+			// }
+			if (fds[1].revents & POLLIN){
+				struct vehicle_local_position_s raw;
+				orb_copy(ORB_ID(vehicle_local_position), vehicle_local_position_sub_fd, &raw);
+				PX4_INFO("Vehicle loc: \t%8.4f\t%8.4f\t%8.4f",
+					(double)raw.x,
+					(double)raw.y,
+					(double)raw.z);
 			}
 
 			/* there could be more file descriptors here, in the form like:

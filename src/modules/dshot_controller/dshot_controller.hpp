@@ -44,6 +44,9 @@
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
 #include <uORB/topics/actuator_armed.h>
+#include <uORB/topics/esc_status.h>
+#include <uORB/topics/sensor_gyro_integrated.h>
+#include <uORB/uORB.h>
 
 
 class DshotController : public ModuleBase<DshotController>, public ModuleParams, public px4::WorkItem
@@ -62,6 +65,8 @@ public:
 	static int print_usage(const char *reason = nullptr);
 
 
+	int print_status() override;
+
 	bool init();
 
 
@@ -69,6 +74,16 @@ private:
 	void Run() override;
 
 	uORB::SubscriptionCallbackWorkItem _vehicle_angular_velocity_sub{this, ORB_ID(vehicle_angular_velocity)};
+
+	// uORB::SubscriptionCallbackWorkItem _esc_status_sub{this, ORB_ID(esc_status)};
+
+	// uORB::SubscriptionCallbackWorkItem _telemetry_status_sub{this, ORB_ID(telemetry_status)};
+
+
+	// px4_pollfd_struct_t fds[2];
+	// int _esc_status_sub_fd;
+	// int _telemetry_status_sub_fd;
+
 
 	uORB::Publication<actuator_controls_s>		_actuators_0_pub;
 
@@ -80,6 +95,20 @@ private:
 
 	struct actuator_armed_s  _act_arm;
 	orb_advert_t _act_armed_pub;
+
+	uORB::Subscription _gyro_integrated_sub{ORB_ID(sensor_gyro_integrated)};
+	unsigned long _gyro_msgs_received_counter;
+	bool _next_gyro_msg_available = false;
+	sensor_gyro_integrated_s _current_gyro_integrated;
+	bool get_gyro_msg(sensor_gyro_integrated_s &gyro_msg);
+
+	uORB::Subscription _esc_info_sub{ORB_ID(esc_status)};
+	unsigned long _esc_msgs_received_counter;
+	bool _next_esc_msg_available = false;
+	esc_status_s _current_esc_status;
+	bool get_esc_msg(esc_status_s &esc_msg);
+
+	void print_esc_status(esc_status_s esc_status, long int count);
 
 	static void arm_motors();
 	static void disarm_motors();

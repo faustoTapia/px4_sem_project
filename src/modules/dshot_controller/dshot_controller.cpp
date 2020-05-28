@@ -54,11 +54,6 @@ DshotController::~DshotController()
 void
 DshotController::arm_motors()
 {
-	/* advertise actuator_armed*/
-	// struct actuator_armed_s  act_arm;
-	// memset (&act_arm, 0, sizeof(act_arm));
-	// orb_advert_t act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &act_arm);
-
 	get_instance()->_act_arm.armed_time_ms = (int)(hrt_absolute_time()/1000);
 	get_instance()->_act_arm.armed = true;
 	get_instance()->_act_arm.prearmed = false;
@@ -68,19 +63,12 @@ DshotController::arm_motors()
 	get_instance()->_act_arm.force_failsafe = false;
 	get_instance()->_act_arm.in_esc_calibration_mode = false;
 	get_instance()->_act_arm.soft_stop = false;
-
 	orb_publish(ORB_ID(actuator_armed), get_instance()->_act_armed_pub, &get_instance()->_act_arm);
 }
 
 void
 DshotController::disarm_motors()
 {
-	/* advertise actuator_armed*/
-	// struct actuator_armed_s  act_arm;
-	// memset (&act_arm, 0, sizeof(act_arm));
-	// orb_advert_t act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &act_arm);
-
-	// uORB::Publication<actuator_armed_s> actuator_armed_pub(ORB_ID(actuator_armed));
 	get_instance()->_act_arm.armed_time_ms = (int)(hrt_absolute_time()/1000);
 	get_instance()->_act_arm.armed = false;
 	get_instance()->_act_arm.prearmed = false;
@@ -91,7 +79,6 @@ DshotController::disarm_motors()
 	get_instance()->_act_arm.in_esc_calibration_mode = false;
 	get_instance()->_act_arm.soft_stop = false;
 	orb_publish(ORB_ID(actuator_armed), get_instance()->_act_armed_pub, &get_instance()->_act_arm);
-
 }
 
 
@@ -102,22 +89,12 @@ DshotController::init()
 		PX4_ERR("vehicle_angular_velocity callback registration failed!");
 		return false;
 	}
-	actuator_controls_s act_ctrl_instantaenous;
-	act_ctrl_instantaenous.timestamp = hrt_absolute_time();
-	act_ctrl_instantaenous.timestamp_sample = hrt_absolute_time();
-	act_ctrl_instantaenous.control[0] = 0;
-	act_ctrl_instantaenous.control[1] = 0;
-	act_ctrl_instantaenous.control[2] = 0;
-	act_ctrl_instantaenous.control[3] = 0;
-	act_ctrl_instantaenous.control[4] = 0;
-	act_ctrl_instantaenous.control[5] = 0;
-	act_ctrl_instantaenous.control[6] = 0;
-	act_ctrl_instantaenous.control[7] = 0;
-	_act_ctrl = act_ctrl_instantaenous;
 
 	memset (&_act_arm, 0, sizeof(_act_arm));
 	_act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &_act_arm);
 
+	_gyro_msgs_received_counter = 0;
+	_esc_msgs_received_counter = 0;
 	return true;
 }
 
@@ -125,13 +102,31 @@ DshotController::init()
 void
 DshotController::Run()
 {
+	perf_begin(_loop_perf);
 	if (should_exit()) {
 		_vehicle_angular_velocity_sub.unregisterCallback();
 		exit_and_cleanup();
 		return;
 	}
 
-	perf_begin(_loop_perf);
+
+	if (_gyro_integrated_sub.updated()){
+		_gyro_integrated_sub.update(&_current_gyro_integrated);
+		if (_gyro_msgs_received_counter%400==0){
+			_next_gyro_msg_available = true;
+			// _msgs_received_counter = 0;
+		}
+		_gyro_msgs_received_counter++;
+	}
+
+	if (_esc_info_sub.updated()){
+		_esc_info_sub.update(&_current_esc_status);
+		if(_esc_msgs_received_counter%1==0){
+			_next_esc_msg_available = true;
+		}
+		_esc_msgs_received_counter++;
+	}
+
 	vehicle_angular_velocity_s ang_vel;
 	if (_vehicle_angular_velocity_sub.update(&ang_vel)){
 		_act_ctrl.timestamp = hrt_absolute_time();
@@ -151,6 +146,7 @@ int DshotController::task_spawn(int argc, char *argv[])
 		_task_id = task_id_is_work_queue;
 
 		if (instance->init()) {
+			PX4_INFO("Instance Initialized");
 			return PX4_OK;
 		}
 
@@ -179,22 +175,6 @@ int DshotController::custom_command(int argc, char *argv[])
 		PX4_INFO("Disarming");
 		disarm_motors();
 		return 0;
-	}
-
-	if (!strcmp(verb, "throttle")){
-		if (is_running()){
-			actuator_controls_s act_ctrl_temp;
-			act_ctrl_temp = get_instance()->_act_ctrl;
-			PX4_INFO("Current throttle: ");
-			PX4_INFO("Timestamp: %ld", (long)act_ctrl_temp.timestamp);
-			for (int i=0 ; i < 8; i++){
-				PX4_INFO("Motor %d: %f", i+1, (double)act_ctrl_temp.control[i]);
-			}
-			return 0;
-		}
-		print_usage("Module not started");
-		return -1;
-
 	}
 
 	if (!strcmp(verb, "command")){
@@ -244,7 +224,153 @@ int DshotController::custom_command(int argc, char *argv[])
 
 	}
 
+	if (!strcmp(verb, "listen_gyro")){
+		if (is_running()){
+			int myoptind = 1;
+			int ch;
+			int num_of_samples = 0;
+			const char *myoptarg = nullptr;
+			while ((ch = px4_getopt(argc, argv, "n:", &myoptind, &myoptarg)) != EOF) {
+				switch (ch) {
+				case 'n':
+					num_of_samples = strtol(myoptarg, nullptr, 10);
+					if (num_of_samples<=0 || num_of_samples>=100){
+						return print_usage("Invalind num of samples");
+					}
+					break;
+				default:
+					return print_usage("unrecognized flag");
+				}
+			}
+			PX4_INFO("Listening gyro %d samples", num_of_samples);
+			int count = 0;
+			hrt_abstime prev_time = hrt_absolute_time();
+			sensor_gyro_integrated_s gyro_temp;
+			while(count<num_of_samples){
+
+				if (get_instance()->get_gyro_msg(gyro_temp)){
+					prev_time = hrt_absolute_time();
+					PX4_INFO("Gyro Integrated count: %d", count+1);
+					PX4_INFO("\t Timestamp: %ld", (long)gyro_temp.timestamp);
+					PX4_INFO("\t Delta angle: %f\t%f\t%f", (double)gyro_temp.delta_angle[0], (double)gyro_temp.delta_angle[1], (double)gyro_temp.delta_angle[2]);
+					count++;
+				}else if (hrt_absolute_time()-prev_time > 2e6){
+					prev_time = hrt_absolute_time();
+					PX4_INFO("Gyro Integrated count: %d Timedout",count+1);
+					count++;
+				}else{
+					px4_usleep(1000);
+				}
+			}
+			return 0;
+		}
+		return print_usage("Module not started");
+
+	}
+
+	if (!strcmp(verb, "listen_esc")){
+		if (is_running()){
+			int myoptind = 1;
+			int ch;
+			int num_of_samples = 0;
+			const char *myoptarg = nullptr;
+			while ((ch = px4_getopt(argc, argv, "n:", &myoptind, &myoptarg)) != EOF) {
+				switch (ch) {
+				case 'n':
+					num_of_samples = strtol(myoptarg, nullptr, 10);
+					if (num_of_samples<=0 || num_of_samples>=100){
+						return print_usage("Invalind num of samples");
+					}
+					break;
+				default:
+					return print_usage("unrecognized flag");
+				}
+			}
+			PX4_INFO("Listening esc %d samples", num_of_samples);
+			int count = 0;
+			hrt_abstime prev_time = hrt_absolute_time();
+			esc_status_s esc_temp;
+			while(count<num_of_samples){
+
+				if (get_instance()->get_esc_msg(esc_temp)){
+					prev_time = hrt_absolute_time();
+					get_instance()->print_esc_status(esc_temp, count+1);
+					count++;
+				}else if (hrt_absolute_time()-prev_time > 5e5){
+					prev_time = hrt_absolute_time();
+					PX4_INFO("Esc status count: %d Timedout",count+1);
+					count++;
+				}else{
+					px4_usleep(1000);
+				}
+			}
+			return 0;
+		}
+		return print_usage("Module not started");
+
+	}
+
+
 	return print_usage("unknown command");
+}
+
+bool DshotController::get_gyro_msg(sensor_gyro_integrated_s &gyro_msg){
+	if (_next_gyro_msg_available){
+		gyro_msg = _current_gyro_integrated;
+		_next_gyro_msg_available = false;
+		return true;
+	}
+	return false;
+}
+
+bool DshotController::get_esc_msg(esc_status_s &esc_msg){
+	if (_next_esc_msg_available){
+		esc_msg = _current_esc_status;
+		_next_esc_msg_available = false;
+		return true;
+	}
+	return false;
+}
+
+
+void DshotController::print_esc_status(esc_status_s esc_status, long int count){
+	PX4_INFO("Esc status: %ld", count);
+	PX4_INFO("\tTimestamp: %llu", (unsigned long long)esc_status.timestamp);
+	PX4_INFO("\tRPM\tVoltage\tCurrent\tTemperature");
+	for (int i =0; i<esc_status.CONNECTED_ESC_MAX; i++){
+		PX4_INFO("\t%ld\t%f\t%f\t%d",
+		(long)esc_status.esc[i].esc_rpm,
+		(double)esc_status.esc[i].esc_voltage,
+		(double)esc_status.esc[i].esc_current,
+		(int)esc_status.esc[i].esc_temperature);
+	}
+}
+
+int DshotController::print_status(){
+
+	if (is_running()){
+		PX4_INFO("Running");
+		actuator_controls_s act_ctrl_temp;
+		act_ctrl_temp = get_instance()->_act_ctrl;
+		PX4_INFO("Current throttle: ");
+		PX4_INFO("Timestamp: %ld", (long)act_ctrl_temp.timestamp);
+		for (int i=0 ; i < 8; i++){
+			PX4_INFO("Motor %d: %f", i+1, (double)act_ctrl_temp.control[i]);
+		}
+		PX4_INFO("Msgs Received Counter: %ld", _gyro_msgs_received_counter);
+
+		sensor_gyro_integrated_s gyro_temp;
+		gyro_temp = get_instance()->_current_gyro_integrated;
+		PX4_INFO("Gyro Integrated: ");
+		PX4_INFO("\t Timestamp: %llu", (unsigned long long)gyro_temp.timestamp);
+		PX4_INFO("\t Delta angle: %f\t%f\t%f", (double)gyro_temp.delta_angle[0], (double)gyro_temp.delta_angle[1], (double)gyro_temp.delta_angle[2]);
+		esc_status_s esc_stat = get_instance()->_current_esc_status;
+		print_esc_status(esc_stat,0);
+		return 0;
+	}
+	print_usage("Module not started");
+	return -1;
+
 }
 
 int DshotController::print_usage(const char *reason)
@@ -260,7 +386,7 @@ This implements communication to esc via Dshot protocol
 
 )DESCR_STR");
 
-	PRINT_MODULE_USAGE_NAME("mc_rate_control", "controller");
+	PRINT_MODULE_USAGE_NAME("dshot_controller", "controller");
 	PRINT_MODULE_USAGE_COMMAND("start");
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 
