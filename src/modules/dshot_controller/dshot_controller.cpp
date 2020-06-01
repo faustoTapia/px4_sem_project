@@ -92,8 +92,7 @@ DshotController::init()
 
 	memset (&_act_arm, 0, sizeof(_act_arm));
 	_act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &_act_arm);
-
-	_gyro_msgs_received_counter = 0;
+	set_all_ctrls(0);
 	_esc_msgs_received_counter = 0;
 	return true;
 }
@@ -107,16 +106,6 @@ DshotController::Run()
 		_vehicle_angular_velocity_sub.unregisterCallback();
 		exit_and_cleanup();
 		return;
-	}
-
-
-	if (_gyro_integrated_sub.updated()){
-		_gyro_integrated_sub.update(&_current_gyro_integrated);
-		if (_gyro_msgs_received_counter%400==0){
-			_next_gyro_msg_available = true;
-			// _msgs_received_counter = 0;
-		}
-		_gyro_msgs_received_counter++;
 	}
 
 	if (_esc_info_sub.updated()){
@@ -181,10 +170,11 @@ int DshotController::custom_command(int argc, char *argv[])
 		if (is_running()){
 			int motor_index =0;
 			float motor_power = 0.0;
+			bool set_all = false;
 			int myoptind = 1;
 			int ch;
 			const char *myoptarg = nullptr;
-			while ((ch = px4_getopt(argc, argv, "m:p:", &myoptind, &myoptarg)) != EOF) {
+			while ((ch = px4_getopt(argc, argv, "m:p:a", &myoptind, &myoptarg)) != EOF) {
 				switch (ch) {
 				case 'm':
 
@@ -199,69 +189,22 @@ int DshotController::custom_command(int argc, char *argv[])
 						return print_usage("invalid throttle");
 					}
 					break;
-				default:
-					return print_usage("unrecognized flag");
-				}
-			}
-
-			actuator_controls_s act_ctrl_temp;
-			act_ctrl_temp.timestamp = hrt_absolute_time();
-			act_ctrl_temp.timestamp_sample = hrt_absolute_time();
-			act_ctrl_temp.control[0] = 0.0;
-			act_ctrl_temp.control[1] = 0.0;
-			act_ctrl_temp.control[2] = 0.0;
-			act_ctrl_temp.control[3] = 0.0;
-			act_ctrl_temp.control[4] = 0.0;
-			act_ctrl_temp.control[5] = 0.0;
-			act_ctrl_temp.control[6] = 0.0;
-			act_ctrl_temp.control[7] = 0.0;
-			act_ctrl_temp.control[motor_index] = motor_power;
-			get_instance()->_act_ctrl=act_ctrl_temp;
-			PX4_INFO("Sent speed motor %d: %f", motor_index+1, (double)get_instance()->_act_ctrl.control[motor_index]);
-			return 0;
-		}
-		return print_usage("Module not started");
-
-	}
-
-	if (!strcmp(verb, "listen_gyro")){
-		if (is_running()){
-			int myoptind = 1;
-			int ch;
-			int num_of_samples = 0;
-			const char *myoptarg = nullptr;
-			while ((ch = px4_getopt(argc, argv, "n:", &myoptind, &myoptarg)) != EOF) {
-				switch (ch) {
-				case 'n':
-					num_of_samples = strtol(myoptarg, nullptr, 10);
-					if (num_of_samples<=0 || num_of_samples>=100){
-						return print_usage("Invalind num of samples");
-					}
+				case 'a':
+					set_all = true;
 					break;
 				default:
 					return print_usage("unrecognized flag");
 				}
 			}
-			PX4_INFO("Listening gyro %d samples", num_of_samples);
-			int count = 0;
-			hrt_abstime prev_time = hrt_absolute_time();
-			sensor_gyro_integrated_s gyro_temp;
-			while(count<num_of_samples){
 
-				if (get_instance()->get_gyro_msg(gyro_temp)){
-					prev_time = hrt_absolute_time();
-					PX4_INFO("Gyro Integrated count: %d", count+1);
-					PX4_INFO("\t Timestamp: %ld", (long)gyro_temp.timestamp);
-					PX4_INFO("\t Delta angle: %f\t%f\t%f", (double)gyro_temp.delta_angle[0], (double)gyro_temp.delta_angle[1], (double)gyro_temp.delta_angle[2]);
-					count++;
-				}else if (hrt_absolute_time()-prev_time > 2e6){
-					prev_time = hrt_absolute_time();
-					PX4_INFO("Gyro Integrated count: %d Timedout",count+1);
-					count++;
-				}else{
-					px4_usleep(1000);
-				}
+			if (set_all){
+				set_all_ctrls(motor_power);
+			}else{
+				set_ctrl(motor_index, motor_power);
 			}
+			PX4_INFO("Set act_controls to:");
+			print_act_ctrl(get_instance()->_act_ctrl);
+
 			return 0;
 		}
 		return print_usage("Module not started");
@@ -314,13 +257,25 @@ int DshotController::custom_command(int argc, char *argv[])
 	return print_usage("unknown command");
 }
 
-bool DshotController::get_gyro_msg(sensor_gyro_integrated_s &gyro_msg){
-	if (_next_gyro_msg_available){
-		gyro_msg = _current_gyro_integrated;
-		_next_gyro_msg_available = false;
-		return true;
+void DshotController::set_all_ctrls(float new_val){
+	if (new_val<=1 && new_val >=0){
+		if(is_running()){
+			actuator_controls_s act_ctrl_temp;
+			for (int i = 0; i < get_instance()->_act_ctrl.NUM_ACTUATOR_CONTROLS; i++){
+				act_ctrl_temp.control[i] = new_val;
+			}
+			act_ctrl_temp.timestamp = hrt_absolute_time();
+			act_ctrl_temp.timestamp_sample = act_ctrl_temp.timestamp;
+			get_instance()->_act_ctrl = act_ctrl_temp;
+		}
 	}
-	return false;
+}
+
+void DshotController::set_ctrl(int index, float new_val){
+	if (index<get_instance()->_act_ctrl.NUM_ACTUATOR_CONTROLS && index>=0
+	   && new_val>=0 && new_val <=1){
+		   get_instance()->_act_ctrl.control[index] = new_val;
+	}
 }
 
 bool DshotController::get_esc_msg(esc_status_s &esc_msg){
@@ -331,7 +286,6 @@ bool DshotController::get_esc_msg(esc_status_s &esc_msg){
 	}
 	return false;
 }
-
 
 void DshotController::print_esc_status(esc_status_s esc_status, long int count){
 	PX4_INFO("Esc status: %ld", count);
@@ -346,24 +300,22 @@ void DshotController::print_esc_status(esc_status_s esc_status, long int count){
 	}
 }
 
+void DshotController::print_act_ctrl(actuator_controls_s act_ctrl_temp){
+	PX4_INFO("act_control");
+	PX4_INFO("Timestamp: %ld", (long)act_ctrl_temp.timestamp);
+	for (int i=0 ; i < 8; i++){
+		PX4_INFO("\tMotor %d: %f", i+1, (double)act_ctrl_temp.control[i]);
+	}
+}
+
 int DshotController::print_status(){
 
 	if (is_running()){
-		PX4_INFO("Running");
+		PX4_INFO("Module Running");
 		actuator_controls_s act_ctrl_temp;
 		act_ctrl_temp = get_instance()->_act_ctrl;
-		PX4_INFO("Current throttle: ");
-		PX4_INFO("Timestamp: %ld", (long)act_ctrl_temp.timestamp);
-		for (int i=0 ; i < 8; i++){
-			PX4_INFO("Motor %d: %f", i+1, (double)act_ctrl_temp.control[i]);
-		}
-		PX4_INFO("Msgs Received Counter: %ld", _gyro_msgs_received_counter);
+		print_act_ctrl(act_ctrl_temp);
 
-		sensor_gyro_integrated_s gyro_temp;
-		gyro_temp = get_instance()->_current_gyro_integrated;
-		PX4_INFO("Gyro Integrated: ");
-		PX4_INFO("\t Timestamp: %llu", (unsigned long long)gyro_temp.timestamp);
-		PX4_INFO("\t Delta angle: %f\t%f\t%f", (double)gyro_temp.delta_angle[0], (double)gyro_temp.delta_angle[1], (double)gyro_temp.delta_angle[2]);
 		esc_status_s esc_stat = get_instance()->_current_esc_status;
 		print_esc_status(esc_stat,0);
 		return 0;

@@ -96,12 +96,6 @@ private:
 	struct actuator_armed_s  _act_arm;
 	orb_advert_t _act_armed_pub;
 
-	uORB::Subscription _gyro_integrated_sub{ORB_ID(sensor_gyro_integrated)};
-	unsigned long _gyro_msgs_received_counter;
-	bool _next_gyro_msg_available = false;
-	sensor_gyro_integrated_s _current_gyro_integrated;
-	bool get_gyro_msg(sensor_gyro_integrated_s &gyro_msg);
-
 	uORB::Subscription _esc_info_sub{ORB_ID(esc_status)};
 	unsigned long _esc_msgs_received_counter;
 	bool _next_esc_msg_available = false;
@@ -109,8 +103,12 @@ private:
 	bool get_esc_msg(esc_status_s &esc_msg);
 
 	void print_esc_status(esc_status_s esc_status, long int count);
+	static void print_act_ctrl(actuator_controls_s act_ctrl_temp);
+
 
 	static void arm_motors();
 	static void disarm_motors();
 
+	static void set_all_ctrls(float new_val);
+	static void set_ctrl(int index, float new_val);
 };

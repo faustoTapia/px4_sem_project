@@ -240,6 +240,9 @@ private:
 		(ParamInt<px4::params::MOT_POLE_COUNT>) _param_mot_pole_count
 	)
 
+	unsigned long _telemetry_debug_count 	= -10;
+	unsigned long _gen_debug		= -10;
+
 };
 
 char DShotOutput::_telemetry_device[] {};
@@ -558,6 +561,7 @@ void DShotOutput::updateTelemetryNumMotors()
 	if (_mixing_output.mixers()) {
 		motor_count = _mixing_output.mixers()->get_multirotor_count();
 	}
+	motor_count = 4;
 
 	_telemetry->handler.setNumMotors(motor_count);
 }
@@ -612,8 +616,8 @@ void DShotOutput::handleNewTelemetryData(int motor_index, const DShotTelemetry::
 		// reset esc data (in case a motor times out, so we won't send stale data)
 		memset(&esc_status.esc, 0, sizeof(_telemetry->esc_status_pub.get().esc));
 		esc_status.esc_online_flags = 0;
+		// _telemetry_debug_count++;
 	}
-
 	_telemetry->last_motor_index = motor_index;
 }
 
@@ -697,12 +701,21 @@ bool DShotOutput::updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS
 
 	if (_telemetry) {
 		// check for an ESC info request. We only process it when we're not expecting other telemetry data
+		// if (_request_esc_info.load() != nullptr && !_waiting_for_esc_info && stop_motors
+		//     && !_telemetry->handler.expectingData() && !_current_command.valid()){_telemetry_debug_count++;}
 		if (_request_esc_info.load() != nullptr && !_waiting_for_esc_info && stop_motors
 		    && !_telemetry->handler.expectingData() && !_current_command.valid()) {
 			requested_telemetry_index = requestESCInfo();
 
 		} else {
 			requested_telemetry_index = _mixing_output.reorderedMotorIndex(_telemetry->handler.getRequestMotorIndex());
+			// if (requested_telemetry_index>=0){
+			// 	_telemetry_debug_count = requested_telemetry_index;
+			// }
+			if(requested_telemetry_index>=0){
+				_gen_debug = requested_telemetry_index;
+			}
+
 		}
 	}
 
@@ -766,19 +779,22 @@ DShotOutput::Run()
 		update_dshot_out_state(outputs_on);
 	}
 
+
 	if (_telemetry) {
 		int telem_update = _telemetry->handler.update();
-
+		// _gen_debug = telem_update;//_telemetry->handler.numMotors();
 		// Are we waiting for ESC info?
 		if (_waiting_for_esc_info) {
 			if (telem_update != -1) {
 				_request_esc_info.store(nullptr);
 				_waiting_for_esc_info = false;
 			}
+			_telemetry_debug_count++;
 
 		} else if (telem_update >= 0) {
 			handleNewTelemetryData(telem_update, _telemetry->handler.latestESCData());
 		}
+
 	}
 
 	if (_param_sub.updated()) {
@@ -1628,6 +1644,12 @@ int DShotOutput::print_status()
 		PX4_INFO("telemetry on: %s", _telemetry_device);
 		_telemetry->handler.printStatus();
 	}
+
+	PX4_INFO("general_debu: %ld", _gen_debug);
+	PX4_INFO("Number of times _telemetry_debu_count %ld", _telemetry_debug_count);
+	PX4_INFO("Waiting for esc info: %s", _waiting_for_esc_info ? "yes" : "no");
+	PX4_INFO("Expecting data: %s",_telemetry->handler.expectingData()? "yes" : "no");
+	PX4_INFO("Current command valid: %s", _current_command.valid() ? "yes" : "no");
 
 	char str_out[8];
 	size_t counter;
