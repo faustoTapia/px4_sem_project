@@ -120,6 +120,8 @@ public:
 	unsigned			set_trim(float trim) override;
 	unsigned			get_trim(float *trim) override;
 
+	unsigned get_multirotor_count() override{return 65535;}
+
 private:
 
 	/**

@@ -561,7 +561,7 @@ void DShotOutput::updateTelemetryNumMotors()
 	if (_mixing_output.mixers()) {
 		motor_count = _mixing_output.mixers()->get_multirotor_count();
 	}
-	motor_count = 4;
+	// motor_count = 4;
 
 	_telemetry->handler.setNumMotors(motor_count);
 }
@@ -1650,6 +1650,7 @@ int DShotOutput::print_status()
 	PX4_INFO("Waiting for esc info: %s", _waiting_for_esc_info ? "yes" : "no");
 	PX4_INFO("Expecting data: %s",_telemetry->handler.expectingData()? "yes" : "no");
 	PX4_INFO("Current command valid: %s", _current_command.valid() ? "yes" : "no");
+	PX4_INFO("motor_count: %d", get_instance()->_mixing_output.mixers()->get_multirotor_count());
 
 	char str_out[8];
 	size_t counter;

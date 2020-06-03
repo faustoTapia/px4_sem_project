@@ -141,15 +141,17 @@ MixerGroup::set_airmode(Mixer::Airmode airmode)
 unsigned
 MixerGroup::get_multirotor_count()
 {
+	unsigned motor_counter = 0;
 	for (auto mixer : _mixers) {
 		unsigned rotor_count = mixer->get_multirotor_count();
-
-		if (rotor_count > 0) {
+		if (rotor_count == 65535){
+			motor_counter++;
+		}else if (rotor_count > 0) {
 			return rotor_count;
 		}
 	}
-
-	return 0;
+	return motor_counter;
+	// return 0;
 }
 
 uint16_t
