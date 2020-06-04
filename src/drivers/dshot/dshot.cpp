@@ -1482,8 +1482,23 @@ int DShotOutput::custom_command(int argc, char *argv[])
 			PX4_ERR("Motor index invalid");
 			return -1;
 		}
+
+
+		dshot_command_t cmdd;
+		if (motor_power >= 1800){
+			cmdd = dshot_command_t{DShot_throttle_full};
+		}
+		else if (motor_power>=1500){
+			cmdd = dshot_command_t{DShot_throttle_3_quarter};
+		}else if (motor_power>=1000){
+			cmdd = dshot_command_t{DShot_throttle_half};
+		}else if (motor_power>=500){
+			cmdd = dshot_command_t{DShot_throttle_quarter};
+		}else{
+			cmdd = dshot_command_t{DShot_cmd_MIN_throttle};
+		}
 		// up_dshot_motor_command(motor_index, motor_power, motor_telem);
-		get_instance()->sendCommandThreadSafe(dshot_command_t{DShot_throttle_half}, 5000, motor_index);
+		get_instance()->sendCommandThreadSafe(cmdd, 5000, motor_index);
 		PX4_INFO("\n Motor: %d\n Power: %d\n Telem Req: %d\n", motor_index, motor_power, motor_telem);
 
 		return 0;
@@ -1651,6 +1666,13 @@ int DShotOutput::print_status()
 	PX4_INFO("Expecting data: %s",_telemetry->handler.expectingData()? "yes" : "no");
 	PX4_INFO("Current command valid: %s", _current_command.valid() ? "yes" : "no");
 	PX4_INFO("motor_count: %d", get_instance()->_mixing_output.mixers()->get_multirotor_count());
+	PX4_INFO("test_output: %f\t%f\t%f\t%f\t", (double)test_output[0], (double)test_output[1], (double)test_output[2], (double)test_output[3]);
+	PX4_INFO("test_min_output: %d\t%d\t%d\t%d\t", (int)test_min_int[0], (int)test_min_int[1], (int)test_min_int[2], (int)test_min_int[3]);
+	PX4_INFO("test_max_output: %d\t%d\t%d\t%d\t", (int)test_max_int[0], (int)test_max_int[1], (int)test_max_int[2], (int)test_max_int[3]);
+	PX4_INFO("test_disarm_output: %d\t%d\t%d\t%d\t", (int)test_disarm_int[0], (int)test_disarm_int[1], (int)test_disarm_int[2], (int)test_disarm_int[3]);
+	PX4_INFO("test_curr_output: %d\t%d\t%d\t%d\t", (int)test_curr_int[0], (int)test_curr_int[1], (int)test_curr_int[2], (int)test_curr_int[3]);
+	PX4_INFO("Trhottle armed: %s", throttle_armed ? "yes":"no");
+	PX4_INFO("Prearmed: %s", prearmed ? "yes":"no");
 
 	char str_out[8];
 	size_t counter;

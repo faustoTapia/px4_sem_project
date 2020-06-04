@@ -1,24 +1,19 @@
-# MAIN 1 Passthrough
+#MAIN 1 Passthrough
 M: 1
-S: 0 0  0  10000      0 0  10000
+S: 0 0  0  20000      -10000 -10000  10000
 
-# MAIN 2 Passthrough
+#MAIN 2 Passthrough
 M: 1
-S: 0 1  0  10000      0 0  10000
+S: 0 1  0  20000      -10000 -10000  10000
 
-# MAIN 3 Passthrough
+#MAIN3 Passthrough
 M: 1
-S: 0 2  0  10000      0 0  10000
+S: 0 2  0  20000      -10000 -10000  10000
 
-
-# MAIN 4 Passthrough
+#MAIN4 Passthrough
 M: 1
-S: 0 3  0  10000      0 0  10000
+S: 0 3  0  20000      -10000 -10000  10000
 
-
-# MAIN 5 Passthrough
-#M: 1
-#S: 0 4  0  10000      0 0  10000
 
 #Failsafe outputs
 #The following outputs are set to their disarmed value

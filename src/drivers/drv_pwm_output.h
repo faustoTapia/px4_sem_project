@@ -332,7 +332,9 @@ typedef enum {
 	DShot_cmd_MAX = 47,
 	DShot_cmd_MIN_throttle = 48,
 	DShot_throttle_full = DSHOT_MAX_THROTTLE + DShot_cmd_MIN_throttle,
-	DShot_throttle_half = 1500 + DShot_cmd_MIN_throttle
+	DShot_throttle_half = 1000 + DShot_cmd_MIN_throttle,
+	DShot_throttle_quarter = DShot_cmd_MIN_throttle + 500,
+	DShot_throttle_3_quarter = DShot_cmd_MIN_throttle+  1500,
 				 // >47 are throttle values
 } dshot_command_t;
 

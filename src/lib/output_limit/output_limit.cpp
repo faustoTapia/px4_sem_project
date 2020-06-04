@@ -205,7 +205,7 @@ void output_limit_calc(const bool armed, const bool pre_armed, const unsigned nu
 				control_value = -1.0f * control_value;
 			}
 
-			effective_output[i] = control_value * (max_output[i] - min_output[i]) / 2 + (max_output[i] + min_output[i]) / 2;
+			effective_output[i] = control_value * (max_output[i] - min_output[i]) / 2 + (max_output[i] + min_output[i]) / 2; //(uint16_t)(control_value * 2000);
 
 			/* last line of defense against invalid inputs */
 			if (effective_output[i] < min_output[i]) {

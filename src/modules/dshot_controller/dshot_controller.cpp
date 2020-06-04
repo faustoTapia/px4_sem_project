@@ -35,7 +35,7 @@
 
 #include <drivers/drv_hrt.h>
 #include <px4_platform_common/getopt.h>
-
+#include <math.h>
 
 DshotController::DshotController():
 	ModuleParams(nullptr),
@@ -247,6 +247,58 @@ int DshotController::custom_command(int argc, char *argv[])
 					px4_usleep(1000);
 				}
 			}
+			return 0;
+		}
+		return print_usage("Module not started");
+
+	}
+
+	if (!strcmp(verb, "run_sine")){
+		if (is_running()){
+			int myoptind = 1;
+			int ch;
+			int period_ms = 2000;
+			int dur_s = 10;
+			uint8_t motor_index = 0;
+			const char *myoptarg = nullptr;
+			while ((ch = px4_getopt(argc, argv, "p:d:m:", &myoptind, &myoptarg)) != EOF) {
+				switch (ch) {
+				case 'm':
+					motor_index = (uint8_t)strtol(myoptarg, nullptr, 10)-1;
+					if (motor_index > get_instance()->_act_ctrl.NUM_ACTUATOR_CONTROLS - 1){
+						return print_usage("Invalid motor_index");
+					}
+					break;
+				case 'p':
+					period_ms = strtol(myoptarg, nullptr, 10);
+					if (period_ms<20 || period_ms>10000){
+						return print_usage("Invalind period_ms, must be in [20,10000]");
+					}
+					break;
+				case 'd':
+					dur_s = strtol(myoptarg, nullptr, 10);
+					if (dur_s<2 || dur_s>20){
+						return print_usage("Invalid duration_s, must be in [2,20]");
+					}
+					break;
+				default:
+					return print_usage("unrecognized flag");
+				}
+			}
+			PX4_INFO("Playing Sinewave. period: %d ms for %d secs",period_ms,dur_s);
+
+			get_instance()->set_ctrl(motor_index, 0);
+
+			hrt_abstime start_time = hrt_absolute_time();
+			float val_to_output = 0;
+			while(hrt_elapsed_time(&start_time) < dur_s*1e6){
+				val_to_output = 0.5*(1-cos(hrt_elapsed_time(&start_time)*3.1416*2/1000/period_ms));
+				get_instance()->set_ctrl(motor_index, val_to_output);
+				px4_usleep(1000);
+			}
+
+			get_instance()->set_ctrl(motor_index, 0);
+
 			return 0;
 		}
 		return print_usage("Module not started");
