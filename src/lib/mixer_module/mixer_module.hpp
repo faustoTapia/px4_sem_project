@@ -78,14 +78,6 @@ public:
 
 	/** called whenever the mixer gets updated/reset */
 	virtual void mixerChanged() {};
-	float test_output[16]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint16_t test_output_int[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint16_t test_min_int[16] = {5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5};
-	uint16_t test_max_int[16] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5};
-	uint16_t test_disarm_int[16] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5};
-	uint16_t test_curr_int[16] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5};
-	bool throttle_armed = false;
-	bool prearmed = false;
 
 };
 

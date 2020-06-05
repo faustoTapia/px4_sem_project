@@ -364,21 +364,9 @@ bool MixingOutput::update()
 	/* do mixing */
 	float outputs[MAX_ACTUATORS] {};
 	const unsigned mixed_num_outputs = _mixers->mix(outputs, _max_num_outputs);
-	// uint16_t min_vals[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	/* the output limit call takes care of out of band errors, NaN and constrains */
 	output_limit_calc(_throttle_armed, armNoThrottle(), mixed_num_outputs, _reverse_output_mask,
 			  _disarmed_value, _min_value, _max_value, outputs, _current_output_value, &_output_limit);
-
-	for (int i = 0; i <16; i++){
-		_interface.test_output[i] = outputs[i];
-		_interface.test_output_int[i] = _current_output_value[i];
-		_interface.test_min_int[i] = _min_value[i];
-		_interface.test_max_int[i] = _max_value[i];
-		_interface.test_disarm_int[i] = _disarmed_value[i];
-		_interface.test_curr_int[i] = _current_output_value[i];
-		_interface.throttle_armed = _throttle_armed;
-		_interface.prearmed = armNoThrottle();
-	}
 
 	/* overwrite outputs in case of force_failsafe with _failsafe_value values */
 	if (_armed.force_failsafe) {

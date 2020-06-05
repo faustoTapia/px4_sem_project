@@ -215,13 +215,13 @@ int DshotController::custom_command(int argc, char *argv[])
 		if (is_running()){
 			int myoptind = 1;
 			int ch;
-			int num_of_samples = 0;
+			int num_of_samples = 1;
 			const char *myoptarg = nullptr;
 			while ((ch = px4_getopt(argc, argv, "n:", &myoptind, &myoptarg)) != EOF) {
 				switch (ch) {
 				case 'n':
 					num_of_samples = strtol(myoptarg, nullptr, 10);
-					if (num_of_samples<=0 || num_of_samples>=100){
+					if (num_of_samples<=1 || num_of_samples>=100){
 						return print_usage("Invalind num of samples");
 					}
 					break;
@@ -401,8 +401,16 @@ This implements communication to esc via Dshot protocol
 	PRINT_MODULE_USAGE_COMMAND_DESCR("throttle", "Prints current throttle being sent");
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("command", "Sends throttle command to specified motor (others 0)");
-	PRINT_MODULE_USAGE_PARAM_INT('m', 1, 1, 8, "Motor selected (1-8)", false);
+	PRINT_MODULE_USAGE_PARAM_INT('m', 1, 1, 8, "Motor selected (1-8)", true);
 	PRINT_MODULE_USAGE_PARAM_FLOAT('p', 0.0, 0.0, 1.0, "Throttle value (0-1)", false);
+	PRINT_MODULE_USAGE_PARAM_FLAG('a', "Sets all motors to given power values", true);
+
+	PRINT_MODULE_USAGE_COMMAND_DESCR("listen_esc", "Shows a number of esc datasets retrieved");
+	PRINT_MODULE_USAGE_PARAM_INT('n', 1, 1, 100, "Number of datasets to receive (1-100)", true);
+
+	PRINT_MODULE_USAGE_COMMAND_DESCR("run_sine", "Outputs a Sinusoid from 0 to 1");
+	PRINT_MODULE_USAGE_PARAM_INT('p', 2000, 10, 10000, "Period in ms (10-10000)", true);
+	PRINT_MODULE_USAGE_PARAM_INT('d', 10, 2, 20, "Duration in s (2-20)", true);
 
 	return 0;
 }
