@@ -86,6 +86,7 @@ private:
 
 
 	uORB::Publication<actuator_controls_s>		_actuators_0_pub;
+	uint64_t _actuator_controls_counter;
 
 	perf_counter_t	_loop_perf;			/**< loop duration performance counter */
 

@@ -43,6 +43,7 @@
 using namespace time_literals;
 
 #define DSHOT_TELEMETRY_UART_BAUDRATE 115200
+// #define DSHOT_TELEMETRY_UART_BAUDRATE 230400
 
 DShotTelemetry::~DShotTelemetry()
 {

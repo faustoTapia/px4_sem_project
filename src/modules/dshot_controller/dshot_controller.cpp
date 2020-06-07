@@ -94,6 +94,7 @@ DshotController::init()
 	_act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &_act_arm);
 	set_all_ctrls(0);
 	_esc_msgs_received_counter = 0;
+	_actuator_controls_counter = 0;
 	return true;
 }
 
@@ -110,14 +111,14 @@ DshotController::Run()
 
 	if (_esc_info_sub.updated()){
 		_esc_info_sub.update(&_current_esc_status);
-		if(_esc_msgs_received_counter%1==0){
-			_next_esc_msg_available = true;
-		}
+		_next_esc_msg_available = true;
 		_esc_msgs_received_counter++;
 	}
 
 	vehicle_angular_velocity_s ang_vel;
 	if (_vehicle_angular_velocity_sub.update(&ang_vel)){
+		_actuator_controls_counter++;
+		_act_ctrl.timestamp_sample = _actuator_controls_counter;
 		_act_ctrl.timestamp = hrt_absolute_time();
 		_act_ctrl.timestamp_sample = _act_ctrl.timestamp_sample;
 		_actuators_0_pub.publish(_act_ctrl);
@@ -257,11 +258,13 @@ int DshotController::custom_command(int argc, char *argv[])
 		if (is_running()){
 			int myoptind = 1;
 			int ch;
+			float signal_center = 0.5;
+			float signal_amplitude = 0.1;
 			int period_ms = 2000;
 			int dur_s = 10;
 			uint8_t motor_index = 0;
 			const char *myoptarg = nullptr;
-			while ((ch = px4_getopt(argc, argv, "p:d:m:", &myoptind, &myoptarg)) != EOF) {
+			while ((ch = px4_getopt(argc, argv, "o:a:p:d:m:", &myoptind, &myoptarg)) != EOF) {
 				switch (ch) {
 				case 'm':
 					motor_index = (uint8_t)strtol(myoptarg, nullptr, 10)-1;
@@ -281,18 +284,37 @@ int DshotController::custom_command(int argc, char *argv[])
 						return print_usage("Invalid duration_s, must be in [2,20]");
 					}
 					break;
+
+				case 'o':
+					signal_center = strtof(myoptarg, nullptr);
+					if (signal_center<(float)0 ||  signal_center >(float)0.9){
+						return print_usage("Offset out of range. Needs to be (0.01-0.9)");
+					}
+					break;
+				case 'a':
+					signal_amplitude = strtof(myoptarg, nullptr);
+					if (signal_center<(float)0 || signal_center>(float)0.5){
+						return print_usage("Invalid amplitude, needs to be (0-0.5)");
+					}
+					break;
 				default:
 					return print_usage("unrecognized flag");
 				}
 			}
+
+			if (signal_amplitude+signal_center>(float)0.9 || signal_center-signal_amplitude<(float)0){
+				return print_usage("Invalid Sinewave definition, the wave must be bounded by [0-0.9]");
+			}
+
 			PX4_INFO("Playing Sinewave. period: %d ms for %d secs",period_ms,dur_s);
 
-			get_instance()->set_ctrl(motor_index, 0);
+			get_instance()->set_ctrl(motor_index, signal_center);
+			px4_sleep(1);
 
 			hrt_abstime start_time = hrt_absolute_time();
 			float val_to_output = 0;
 			while(hrt_elapsed_time(&start_time) < dur_s*1e6){
-				val_to_output = 0.5*(1-cos(hrt_elapsed_time(&start_time)*3.1416*2/1000/period_ms));
+				val_to_output = signal_center+signal_amplitude*(float)sin(hrt_elapsed_time(&start_time)*M_PI_F*2/1000/period_ms);
 				get_instance()->set_ctrl(motor_index, val_to_output);
 				px4_usleep(1000);
 			}
@@ -317,7 +339,7 @@ void DshotController::set_all_ctrls(float new_val){
 				act_ctrl_temp.control[i] = new_val;
 			}
 			act_ctrl_temp.timestamp = hrt_absolute_time();
-			act_ctrl_temp.timestamp_sample = act_ctrl_temp.timestamp;
+			act_ctrl_temp.timestamp_sample = get_instance()->_actuator_controls_counter;
 			get_instance()->_act_ctrl = act_ctrl_temp;
 		}
 	}
@@ -409,8 +431,11 @@ This implements communication to esc via Dshot protocol
 	PRINT_MODULE_USAGE_PARAM_INT('n', 1, 1, 100, "Number of datasets to receive (1-100)", true);
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("run_sine", "Outputs a Sinusoid from 0 to 1");
+	PRINT_MODULE_USAGE_PARAM_INT('m', 1, 1, 8, "Motor selected (1-8)", true);
 	PRINT_MODULE_USAGE_PARAM_INT('p', 2000, 10, 10000, "Period in ms (10-10000)", true);
 	PRINT_MODULE_USAGE_PARAM_INT('d', 10, 2, 20, "Duration in s (2-20)", true);
+	PRINT_MODULE_USAGE_PARAM_INT('o', 0.01, 0, 0.9, "Wave Offset (0.01-0.9)", true);
+	PRINT_MODULE_USAGE_PARAM_FLOAT('a', 0.1, 0, 0.5, "Amplitude (0-0.5)", true);
 
 	return 0;
 }
