@@ -430,11 +430,11 @@ This implements communication to esc via Dshot protocol
 	PRINT_MODULE_USAGE_COMMAND_DESCR("listen_esc", "Shows a number of esc datasets retrieved");
 	PRINT_MODULE_USAGE_PARAM_INT('n', 1, 1, 100, "Number of datasets to receive (1-100)", true);
 
-	PRINT_MODULE_USAGE_COMMAND_DESCR("run_sine", "Outputs a Sinusoid from 0 to 1");
+	PRINT_MODULE_USAGE_COMMAND_DESCR("run_sine", "Outputs a Sinusoid to a selected motor");
 	PRINT_MODULE_USAGE_PARAM_INT('m', 1, 1, 8, "Motor selected (1-8)", true);
 	PRINT_MODULE_USAGE_PARAM_INT('p', 2000, 10, 10000, "Period in ms (10-10000)", true);
 	PRINT_MODULE_USAGE_PARAM_INT('d', 10, 2, 20, "Duration in s (2-20)", true);
-	PRINT_MODULE_USAGE_PARAM_INT('o', 0.01, 0, 0.9, "Wave Offset (0.01-0.9)", true);
+	PRINT_MODULE_USAGE_PARAM_FLOAT('o', 0.5, 0.01, 0.9, "Wave Offset (0.01-0.9)", true);
 	PRINT_MODULE_USAGE_PARAM_FLOAT('a', 0.1, 0, 0.5, "Amplitude (0-0.5)", true);
 
 	return 0;

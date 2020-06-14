@@ -559,7 +559,7 @@ void DShotOutput::updateTelemetryNumMotors()
 		motor_count = _mixing_output.mixers()->get_multirotor_count();
 	}
 	// motor_count = 4;
-
+	motor_count = 1;
 	_telemetry->handler.setNumMotors(motor_count);
 }
 
