@@ -420,8 +420,6 @@ This implements communication to esc via Dshot protocol
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("disarm", "Sends disarming command to actuator_armed topic");
 
-	PRINT_MODULE_USAGE_COMMAND_DESCR("throttle", "Prints current throttle being sent");
-
 	PRINT_MODULE_USAGE_COMMAND_DESCR("command", "Sends throttle command to specified motor (others 0)");
 	PRINT_MODULE_USAGE_PARAM_INT('m', 1, 1, 8, "Motor selected (1-8)", true);
 	PRINT_MODULE_USAGE_PARAM_FLOAT('p', 0.0, 0.0, 1.0, "Throttle value (0-1)", false);
