@@ -251,7 +251,7 @@ DShotOutput::DShotOutput() :
 	_cycle_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle"))
 {
 	_mixing_output.setAllDisarmedValues(DISARMED_VALUE);
-	_mixing_output.setAllMinValues(DISARMED_VALUE + 1);
+	_mixing_output.setAllMinValues(DISARMED_VALUE + 0);
 	_mixing_output.setAllMaxValues(DSHOT_MAX_THROTTLE);
 
 }
@@ -827,7 +827,7 @@ void DShotOutput::update_params()
 
 	// we use a minimum value of 1, since 0 is for disarmed
 	_mixing_output.setAllMinValues(math::constrain((int)(_param_dshot_min.get() * (float)DSHOT_MAX_THROTTLE),
-				       DISARMED_VALUE + 1, DSHOT_MAX_THROTTLE));
+				       DISARMED_VALUE + 0, DSHOT_MAX_THROTTLE));
 }
 
 
