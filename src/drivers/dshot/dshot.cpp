@@ -626,6 +626,7 @@ void DShotOutput::handleNewTelemetryData(int motor_index, const DShotTelemetry::
 		// reset esc data (in case a motor times out, so we won't send stale data)
 		memset(&esc_status.esc, 0, sizeof(_telemetry->esc_status_pub.get().esc));
 		esc_status.esc_online_flags = 0;
+		memset(&esc_debug.data, 0, sizeof(_telemetry->esc_debug_pub.get().data));
 		// _telemetry_debug_count++;
 	}
 	_telemetry->last_motor_index = motor_index;
