@@ -62,6 +62,7 @@
 #include <uORB/topics/multirotor_motor_limits.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/esc_status.h>
+#include <uORB/topics/debug_array.h>
 
 #include "telemetry.h"
 
@@ -188,6 +189,7 @@ private:
 	struct Telemetry {
 		DShotTelemetry handler;
 		uORB::PublicationData<esc_status_s> esc_status_pub{ORB_ID(esc_status)};
+		uORB::PublicationData<debug_array_s> esc_debug_pub{ORB_ID(debug_array)};
 		int last_motor_index{-1};
 	};
 
@@ -251,7 +253,7 @@ DShotOutput::DShotOutput() :
 	_cycle_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle"))
 {
 	_mixing_output.setAllDisarmedValues(DISARMED_VALUE);
-	_mixing_output.setAllMinValues(DISARMED_VALUE + 1);
+	_mixing_output.setAllMinValues(DISARMED_VALUE + 0);
 	_mixing_output.setAllMaxValues(DSHOT_MAX_THROTTLE);
 
 }
@@ -587,6 +589,9 @@ void DShotOutput::handleNewTelemetryData(int motor_index, const DShotTelemetry::
 {
 	// fill in new motor data
 	esc_status_s &esc_status = _telemetry->esc_status_pub.get();
+	debug_array_s &esc_debug = _telemetry->esc_debug_pub.get();
+
+
 
 	if (motor_index < esc_status_s::CONNECTED_ESC_MAX) {
 		esc_status.esc_online_flags |= 1 << motor_index;
@@ -608,7 +613,15 @@ void DShotOutput::handleNewTelemetryData(int motor_index, const DShotTelemetry::
 		esc_status.esc_online_flags = (1 << esc_status.esc_count) - 1;
 		esc_status.esc_armed_flags = (1 << esc_status.esc_count) - 1;
 
+		esc_debug.data[0] = esc_status.timestamp;
+		esc_debug.data[1] = esc_status.esc[0].esc_rpm;
+		esc_debug.data[2] = esc_status.esc[0].esc_voltage;
+		esc_debug.data[3] = esc_status.esc[1].esc_rpm;
+		esc_debug.data[4] = esc_status.esc[1].esc_voltage;
+
 		_telemetry->esc_status_pub.update();
+		_telemetry->esc_debug_pub.update();
+
 
 		// reset esc data (in case a motor times out, so we won't send stale data)
 		memset(&esc_status.esc, 0, sizeof(_telemetry->esc_status_pub.get().esc));
@@ -827,7 +840,7 @@ void DShotOutput::update_params()
 
 	// we use a minimum value of 1, since 0 is for disarmed
 	_mixing_output.setAllMinValues(math::constrain((int)(_param_dshot_min.get() * (float)DSHOT_MAX_THROTTLE),
-				       DISARMED_VALUE + 1, DSHOT_MAX_THROTTLE));
+				       DISARMED_VALUE + 0, DSHOT_MAX_THROTTLE));
 }
 
 
