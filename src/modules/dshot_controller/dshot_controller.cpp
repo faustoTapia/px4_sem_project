@@ -115,8 +115,17 @@ DshotController::Run()
 		_esc_msgs_received_counter++;
 	}
 
-	vehicle_angular_velocity_s ang_vel;
-	if (_vehicle_angular_velocity_sub.update(&ang_vel)){
+	// vehicle_angular_velocity_s ang_vel;
+	// if (_vehicle_angular_velocity_sub.update(&ang_vel)){
+	// 	_actuator_controls_counter++;
+	// 	_act_ctrl.timestamp_sample = _actuator_controls_counter;
+	// 	_act_ctrl.timestamp = hrt_absolute_time();
+	// 	_act_ctrl.timestamp_sample = _act_ctrl.timestamp_sample;
+	// 	_actuators_0_pub.publish(_act_ctrl);
+	// }
+
+	vehicle_odometry_s vehicle_odom;
+	if (_vehicle_odometry_sub.update(&vehicle_odom)){
 		_actuator_controls_counter++;
 		_act_ctrl.timestamp_sample = _actuator_controls_counter;
 		_act_ctrl.timestamp = hrt_absolute_time();

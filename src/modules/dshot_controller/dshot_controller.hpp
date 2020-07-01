@@ -46,6 +46,7 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/esc_status.h>
 #include <uORB/topics/sensor_gyro_integrated.h>
+#include <uORB/topics/vehicle_odometry.h>
 #include <uORB/uORB.h>
 
 
@@ -76,7 +77,7 @@ private:
 	uORB::SubscriptionCallbackWorkItem _vehicle_angular_velocity_sub{this, ORB_ID(vehicle_angular_velocity)};
 
 	// uORB::SubscriptionCallbackWorkItem _esc_status_sub{this, ORB_ID(esc_status)};
-
+	uORB::SubscriptionCallbackWorkItem _vehicle_odometry_sub{this, ORB_ID(vehicle_odometry)};
 	// uORB::SubscriptionCallbackWorkItem _telemetry_status_sub{this, ORB_ID(telemetry_status)};
 
 
