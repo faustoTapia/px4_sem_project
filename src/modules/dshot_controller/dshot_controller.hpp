@@ -47,6 +47,7 @@
 #include <uORB/topics/esc_status.h>
 #include <uORB/topics/sensor_gyro_integrated.h>
 #include <uORB/topics/vehicle_odometry.h>
+#include <uORB/topics/vehicle_attitude.h>
 #include <uORB/uORB.h>
 
 
@@ -78,6 +79,7 @@ private:
 
 	// uORB::SubscriptionCallbackWorkItem _esc_status_sub{this, ORB_ID(esc_status)};
 	uORB::SubscriptionCallbackWorkItem _vehicle_odometry_sub{this, ORB_ID(vehicle_odometry)};
+	uORB::SubscriptionCallbackWorkItem _vehicle_attitude_sub{this, ORB_ID(vehicle_attitude)};
 	// uORB::SubscriptionCallbackWorkItem _telemetry_status_sub{this, ORB_ID(telemetry_status)};
 
 
@@ -94,6 +96,7 @@ private:
 	hrt_abstime _last_run{0};
 
 	actuator_controls_s _act_ctrl;
+	actuator_controls_s _prev_act_ctrl;
 
 	struct actuator_armed_s  _act_arm;
 	orb_advert_t _act_armed_pub;
@@ -113,4 +116,5 @@ private:
 
 	static void set_all_ctrls(float new_val);
 	static void set_ctrl(int index, float new_val);
+	uint8_t _downsampling_count = 0;
 };

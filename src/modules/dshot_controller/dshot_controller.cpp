@@ -36,6 +36,8 @@
 #include <drivers/drv_hrt.h>
 #include <px4_platform_common/getopt.h>
 #include <math.h>
+#include <stdlib.h>
+#include <time.h>
 
 DshotController::DshotController():
 	ModuleParams(nullptr),
@@ -90,6 +92,16 @@ DshotController::init()
 		return false;
 	}
 
+	if (!_vehicle_odometry_sub.registerCallback()){
+		PX4_ERR("vehicle_odometry callback registration failed!");
+		return false;
+	}
+
+	if (!_vehicle_attitude_sub.registerCallback()){
+		PX4_ERR("vehicle_attitude callback registration failed!");
+		return false;
+	}
+
 	memset (&_act_arm, 0, sizeof(_act_arm));
 	_act_armed_pub = orb_advertise(ORB_ID(actuator_armed), &_act_arm);
 	set_all_ctrls(0);
@@ -105,6 +117,8 @@ DshotController::Run()
 	perf_begin(_loop_perf);
 	if (should_exit()) {
 		_vehicle_angular_velocity_sub.unregisterCallback();
+		_vehicle_attitude_sub.unregisterCallback();
+		_vehicle_odometry_sub.unregisterCallback();
 		exit_and_cleanup();
 		return;
 	}
@@ -124,13 +138,29 @@ DshotController::Run()
 	// 	_actuators_0_pub.publish(_act_ctrl);
 	// }
 
-	vehicle_odometry_s vehicle_odom;
-	if (_vehicle_odometry_sub.update(&vehicle_odom)){
-		_actuator_controls_counter++;
-		_act_ctrl.timestamp_sample = _actuator_controls_counter;
-		_act_ctrl.timestamp = hrt_absolute_time();
-		_act_ctrl.timestamp_sample = _act_ctrl.timestamp_sample;
-		_actuators_0_pub.publish(_act_ctrl);
+	// vehicle_odometry_s vehicle_odom;
+	// if (_vehicle_odometry_sub.update(&vehicle_odom)){
+	// 	_actuator_controls_counter++;
+	// 	_act_ctrl.timestamp_sample = _actuator_controls_counter;
+	// 	_act_ctrl.timestamp = hrt_absolute_time();
+	// 	_act_ctrl.timestamp_sample = _act_ctrl.timestamp_sample;
+	// 	_actuators_0_pub.publish(_act_ctrl);
+	// }
+
+	vehicle_attitude_s vehicle_attitude;
+	if (_vehicle_attitude_sub.update(&vehicle_attitude)){
+		if (++_downsampling_count % 2 == 0 || !_actuator_controls_counter){
+			_actuator_controls_counter++;
+			_act_ctrl.timestamp_sample = _actuator_controls_counter;
+			_act_ctrl.timestamp = hrt_absolute_time();
+			_actuators_0_pub.publish(_act_ctrl);
+			_prev_act_ctrl =_act_ctrl;
+			_downsampling_count = 0;
+		}else{
+			_prev_act_ctrl.timestamp_sample = _actuator_controls_counter;
+			_prev_act_ctrl.timestamp = hrt_absolute_time();
+			_actuators_0_pub.publish(_prev_act_ctrl);
+		}
 	}
 
 
@@ -336,6 +366,137 @@ int DshotController::custom_command(int argc, char *argv[])
 
 	}
 
+	if (!strcmp(verb, "sweep_sine")){
+		if (is_running()){
+			int myoptind = 1;
+			int ch;
+			float signal_center = 0.4;
+			float signal_amplitude = 0.1;
+			int period_us[] = {8000000,4000000,2000000,1000000,500000,250000,125000,62500,31250,15625};
+			int dur_s = 8;
+			uint8_t motor_index = 0;
+			const char *myoptarg = nullptr;
+			while ((ch = px4_getopt(argc, argv, "o:a:m:", &myoptind, &myoptarg)) != EOF) {
+				switch (ch) {
+				case 'm':
+					motor_index = (uint8_t)strtol(myoptarg, nullptr, 10)-1;
+					if (motor_index > get_instance()->_act_ctrl.NUM_ACTUATOR_CONTROLS - 1){
+						return print_usage("Invalid motor_index");
+					}
+					break;
+				case 'o':
+					signal_center = strtof(myoptarg, nullptr);
+					if (signal_center<(float)0 ||  signal_center >(float)0.9){
+						return print_usage("Offset out of range. Needs to be (0.1-0.9)");
+					}
+					break;
+				case 'a':
+					signal_amplitude = strtof(myoptarg, nullptr);
+					if (signal_amplitude<(float)0 || signal_amplitude>(float)0.6){
+						return print_usage("Invalid amplitude, needs to be (0-0.5)");
+					}
+					break;
+				default:
+					return print_usage("unrecognized flag");
+				}
+			}
+
+			if (signal_amplitude+signal_center>(float)0.9 || signal_center-signal_amplitude<(float)0){
+				return print_usage("Invalid Sinewave definition, the wave must be bounded by [0-0.9]");
+			}
+
+			PX4_INFO("Playing sine sweep for %d seconds",80);
+
+			get_instance()->set_ctrl(motor_index, signal_center);
+			px4_sleep(1);
+
+			for (int i = 0; i<10; i++){
+				hrt_abstime start_time = hrt_absolute_time();
+				float val_to_output = 0;
+				while(hrt_elapsed_time(&start_time) < dur_s*1e6){
+					val_to_output = signal_center+signal_amplitude*(float)sin(hrt_elapsed_time(&start_time)*M_PI_F*2/period_us[i]);
+					get_instance()->set_ctrl(motor_index, val_to_output);
+					px4_usleep(1000);
+				}
+			}
+			get_instance()->set_ctrl(motor_index, signal_center);
+			px4_sleep(1);
+			get_instance()->set_ctrl(motor_index, 0);
+
+			return 0;
+		}
+		return print_usage("Module not started");
+
+	}
+
+	if (!strcmp(verb, "run_random")){
+		if (is_running()){
+			int myoptind = 1;
+			int ch;
+			float signal_min = 0.1;
+			float signal_max = 0.4;
+			int dur_s = 5;
+			uint8_t motor_index = 0;
+			const char *myoptarg = nullptr;
+			while ((ch = px4_getopt(argc, argv, "b:t:d:m:", &myoptind, &myoptarg)) != EOF) {
+				switch (ch) {
+				case 'm':
+					motor_index = (uint8_t)strtol(myoptarg, nullptr, 10)-1;
+					if (motor_index > get_instance()->_act_ctrl.NUM_ACTUATOR_CONTROLS - 1){
+						return print_usage("Invalid motor_index");
+					}
+					break;
+				case 'd':
+					dur_s = strtol(myoptarg, nullptr, 10);
+					if (dur_s<2 || dur_s>20){
+						return print_usage("Invalid duration_s, must be in [2,20]");
+					}
+					break;
+
+				case 'b':
+					signal_min = strtof(myoptarg, nullptr);
+					if (signal_min<(float)0.1 ||  signal_min >(float)0.6){
+						return print_usage("Invalid signal minimum. Needs to be (0.1-0.6)");
+					}
+					break;
+				case 't':
+					signal_max = strtof(myoptarg, nullptr);
+					if (signal_max<(float)0.1 || signal_max>(float)0.6){
+						return print_usage("Invalid signal max, Needs to be (0.1-0.6)");
+					}
+					break;
+				default:
+					return print_usage("unrecognized flag");
+				}
+			}
+			if (signal_min >= signal_max){
+				return print_usage("Invalid signal extrema, must comply with signal_min<signal_max");
+			}
+			PX4_INFO("Playing Random signals for %d secs",dur_s);
+			float signal_center = (signal_max+signal_min)/(float)2.0;
+			get_instance()->set_ctrl(motor_index, signal_center);
+			px4_sleep(1);
+
+			hrt_abstime start_time = hrt_absolute_time();
+			float val_to_output = 0;
+			int max_rand = 1001;
+			srand(time(NULL));
+			while(hrt_elapsed_time(&start_time) < dur_s*1e6){
+
+				val_to_output = signal_center + ((float)(rand()%max_rand)/((float)(max_rand-1)) - (float)0.5)*((signal_max-signal_min)) ;
+				get_instance()->set_ctrl(motor_index, val_to_output);
+				px4_usleep(1000);
+			}
+
+			get_instance()->set_ctrl(motor_index, signal_center);
+			px4_sleep(1);
+			get_instance()->set_ctrl(motor_index, 0);
+
+			return 0;
+		}
+		return print_usage("Module not started");
+
+	}
 
 	return print_usage("unknown command");
 }
@@ -443,6 +604,17 @@ This implements communication to esc via Dshot protocol
 	PRINT_MODULE_USAGE_PARAM_INT('d', 10, 2, 20, "Duration in s (2-20)", true);
 	PRINT_MODULE_USAGE_PARAM_FLOAT('o', 0.5, 0.01, 0.9, "Wave Offset (0.01-0.9)", true);
 	PRINT_MODULE_USAGE_PARAM_FLOAT('a', 0.1, 0, 0.5, "Amplitude (0-0.5)", true);
+
+	PRINT_MODULE_USAGE_COMMAND_DESCR("run_random", "Outputs a random signal to a selected motor");
+	PRINT_MODULE_USAGE_PARAM_INT('m', 1, 1, 8, "Motor selected (1-8)", true);
+	PRINT_MODULE_USAGE_PARAM_INT('d', 5, 2, 20, "Duration in s (2-20)", true);
+	PRINT_MODULE_USAGE_PARAM_FLOAT('b', 0.1, 0.1, 0.6, "Signal min (0.1-0.6)", true);
+	PRINT_MODULE_USAGE_PARAM_FLOAT('t', 0.4, 0.1, 0.4, "Signal max (0.1-0.6)", true);
+
+	PRINT_MODULE_USAGE_COMMAND_DESCR("sweep_sine", "Outputs sinusoid chirp signal (changing frequency)");
+	PRINT_MODULE_USAGE_PARAM_INT('m', 1, 1, 8, "Motor selected (1-8)", true);
+	PRINT_MODULE_USAGE_PARAM_INT('o', 5, 2, 20, "Offset (2-20)", true);
+	PRINT_MODULE_USAGE_PARAM_FLOAT('a', 0.1, 0.1, 0.6, "Amplitude (0.1-0.6)", true);
 
 	return 0;
 }
