@@ -393,7 +393,7 @@ int DshotController::custom_command(int argc, char *argv[])
 				case 'a':
 					signal_amplitude = strtof(myoptarg, nullptr);
 					if (signal_amplitude<(float)0 || signal_amplitude>(float)0.6){
-						return print_usage("Invalid amplitude, needs to be (0-0.5)");
+						return print_usage("Invalid amplitude, needs to be (0-0.6)");
 					}
 					break;
 				default:
@@ -613,8 +613,8 @@ This implements communication to esc via Dshot protocol
 
 	PRINT_MODULE_USAGE_COMMAND_DESCR("sweep_sine", "Outputs sinusoid chirp signal (changing frequency)");
 	PRINT_MODULE_USAGE_PARAM_INT('m', 1, 1, 8, "Motor selected (1-8)", true);
-	PRINT_MODULE_USAGE_PARAM_INT('o', 5, 2, 20, "Offset (2-20)", true);
-	PRINT_MODULE_USAGE_PARAM_FLOAT('a', 0.1, 0.1, 0.6, "Amplitude (0.1-0.6)", true);
+	PRINT_MODULE_USAGE_PARAM_FLOAT('o', 0.4, 0.1, 0.9, "Offset (0.1-0.9)", true);
+	PRINT_MODULE_USAGE_PARAM_FLOAT('a', 0.1, 0.0, 0.6, "Amplitude (0.1-0.6)", true);
 
 	return 0;
 }
