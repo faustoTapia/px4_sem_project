@@ -75,6 +75,10 @@ public:
 private:
 	void Run() override;
 
+	const float _feedforward_gain{1.0/13333};
+	const float _prop_gain{_feedforward_gain*0.1f};
+	const float _integral_gain{_feedforward_gain*0.01f};
+
 	uORB::SubscriptionCallbackWorkItem _vehicle_angular_velocity_sub{this, ORB_ID(vehicle_angular_velocity)};
 
 	// uORB::SubscriptionCallbackWorkItem _esc_status_sub{this, ORB_ID(esc_status)};
@@ -116,5 +120,9 @@ private:
 
 	static void set_all_ctrls(float new_val);
 	static void set_ctrl(int index, float new_val);
-	uint8_t _downsampling_count = 0;
+	uint8_t _downsampling_count {0};
+
+	bool _rpm_control{false};
+	float _rpm_set_point[8];
+	float _rpm_integral[8];
 };

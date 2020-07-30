@@ -127,25 +127,16 @@ DshotController::Run()
 		_esc_info_sub.update(&_current_esc_status);
 		_next_esc_msg_available = true;
 		_esc_msgs_received_counter++;
+
+		if(get_instance()->_rpm_control){
+			for (int i =0; i< +_act_ctrl.NUM_ACTUATOR_CONTROLS; i++){
+				float err = get_instance()->_rpm_set_point[i] - get_instance()->_rpm_set_point[i];
+				get_instance()->_rpm_integral[i] = get_instance()->_rpm_integral[i] +err;
+				set_ctrl(i, _feedforward_gain*_rpm_set_point[i] + _prop_gain*err + _integral_gain*_rpm_integral[i]);
+			}
+		}
 	}
 
-	// vehicle_angular_velocity_s ang_vel;
-	// if (_vehicle_angular_velocity_sub.update(&ang_vel)){
-	// 	_actuator_controls_counter++;
-	// 	_act_ctrl.timestamp_sample = _actuator_controls_counter;
-	// 	_act_ctrl.timestamp = hrt_absolute_time();
-	// 	_act_ctrl.timestamp_sample = _act_ctrl.timestamp_sample;
-	// 	_actuators_0_pub.publish(_act_ctrl);
-	// }
-
-	// vehicle_odometry_s vehicle_odom;
-	// if (_vehicle_odometry_sub.update(&vehicle_odom)){
-	// 	_actuator_controls_counter++;
-	// 	_act_ctrl.timestamp_sample = _actuator_controls_counter;
-	// 	_act_ctrl.timestamp = hrt_absolute_time();
-	// 	_act_ctrl.timestamp_sample = _act_ctrl.timestamp_sample;
-	// 	_actuators_0_pub.publish(_act_ctrl);
-	// }
 
 	vehicle_attitude_s vehicle_attitude;
 	if (_vehicle_attitude_sub.update(&vehicle_attitude)){
@@ -422,6 +413,62 @@ int DshotController::custom_command(int argc, char *argv[])
 			get_instance()->set_ctrl(motor_index, signal_center);
 			px4_sleep(1);
 			get_instance()->set_ctrl(motor_index, 0);
+
+			return 0;
+		}
+		return print_usage("Module not started");
+
+	}
+
+	if(!strcmp(verb, "rpm_control")){
+		if (is_running()){
+			int motor_index =0;
+			float motor_rpm = 0.0;
+			bool set_all = false;
+			int myoptind = 1;
+			int ch;
+			bool enable{get_instance()->_rpm_control};
+			const char *myoptarg = nullptr;
+			while ((ch = px4_getopt(argc, argv, "m:r:e:a", &myoptind, &myoptarg)) != EOF) {
+				switch (ch) {
+				case 'm':
+					motor_index = strtol(myoptarg, nullptr, 10) - 1;
+					if (motor_index<0 || motor_index>7){
+						return print_usage("invalid channel");
+					}
+					break;
+				case 'r':
+					motor_rpm = strtof(myoptarg, nullptr);
+					if (motor_rpm<0 || motor_rpm>10000){
+						return print_usage("invalid rpm");
+					}
+					break;
+				case 'a':
+					set_all = true;
+					break;
+				case 'e':
+					enable = (bool)strtol(myoptarg, nullptr,1);
+					break;
+
+				default:
+					return print_usage("unrecognized flag");
+				}
+			}
+
+
+
+			if (set_all){
+				for(auto &mot_val:get_instance()->_rpm_set_point)
+					mot_val = motor_rpm;
+			}else{
+				get_instance()->_rpm_set_point[motor_index] = motor_rpm;
+			}
+
+			if (enable && !get_instance()->_rpm_control)
+				for (auto &integrl:get_instance()->_rpm_integral)
+					integrl = 0;
+			if (enable)
+				get_instance()->_rpm_control = true;
 
 			return 0;
 		}
