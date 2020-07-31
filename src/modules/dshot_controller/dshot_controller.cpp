@@ -131,8 +131,22 @@ DshotController::Run()
 		if(get_instance()->_rpm_control){
 			for (int i =0; i< +_act_ctrl.NUM_ACTUATOR_CONTROLS; i++){
 				float err = get_instance()->_rpm_set_point[i] - get_instance()->_rpm_set_point[i];
-				get_instance()->_rpm_integral[i] = get_instance()->_rpm_integral[i] +err;
-				set_ctrl(i, _feedforward_gain*_rpm_set_point[i] + _prop_gain*err + _integral_gain*_rpm_integral[i]);
+				float control_val;
+				float temp_integral = get_instance()->_rpm_integral[i] +err;
+				// anti reset-windup
+				if (get_instance()->_act_ctrl.control[i]<1.0f &&get_instance()->_act_ctrl.control[i]>0.0f){
+					get_instance()->_rpm_integral[i] = temp_integral;
+				}
+				control_val = _integral_gain*get_instance()->_rpm_integral[i] + _prop_gain*err;
+				// Limiting to range
+				if (control_val>1.0f)
+					set_ctrl(i, 1.0f);
+				else if (control_val>=0.0f)
+					set_ctrl(i, _feedforward_gain*_rpm_set_point[i] + control_val);
+				else
+					set_ctrl(i, 0.0f);
+
+
 			}
 		}
 	}

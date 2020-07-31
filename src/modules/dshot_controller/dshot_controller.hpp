@@ -75,7 +75,7 @@ public:
 private:
 	void Run() override;
 
-	const float _feedforward_gain{1.0/13333};
+	const float _feedforward_gain{1.0/13333.0};
 	const float _prop_gain{_feedforward_gain*0.1f};
 	const float _integral_gain{_feedforward_gain*0.01f};
 
